@@ -110,7 +110,6 @@ def decrypt_file(input_file, output_file, key):
     except OSError:
         return False
 
-
 def save_key(key, filename):
     """
     Save encryption key to a file
@@ -274,7 +273,7 @@ def decrypt_file_password(input_file, output_file, password):
     with open(input_file, "rb") as file:
         in_magic = file.read(4)
         salt = file.read(SALT_LEN)
-
+        
     # Check if file is SFS1 encrypted
     if  in_magic != MAGIC:
         return False

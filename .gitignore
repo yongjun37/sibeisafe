@@ -8,9 +8,15 @@ venv/
 env/
 ENV/
 
-# Encryption files (don't commit keys!)
+# Node / Frontend
+node_modules/
+dist/
+
+# Encryption files
 *.key
 *.enc
+*-decrypted
+
 
 # OS files
 .DS_Store
