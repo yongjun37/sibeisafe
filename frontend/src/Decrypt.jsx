@@ -1,9 +1,11 @@
+import baseURL from './config.js'
+
 function Decrypt() {
   async function handleDecrypt(e) {
     e.preventDefault()
 
     // Fetch the decrypted file from the backend
-    const response = await fetch('http://localhost:5000/decrypt', {
+    const response = await fetch(baseURL + '/decrypt', {
       method: 'POST',
       body: new FormData(e.target)
     })

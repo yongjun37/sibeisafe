@@ -1,9 +1,11 @@
+import baseURL from './config.js'
+
 function Encrypt() {
   async function handleEncrypt(e) {
     e.preventDefault()
 
     // Fetch the encrypted file from the backend
-    const response = await fetch('http://localhost:5000/encrypt', {
+    const response = await fetch(baseURL + '/encrypt', {
       method: 'POST',
       body: new FormData(e.target)
     })
