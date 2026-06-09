@@ -1,21 +1,67 @@
+# Standard library imports
 import os
-import sys
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+# Third-party imports
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
-from crypto import encrypt_file_password, decrypt_file_password
+from dotenv import load_dotenv
+from flask_bcrypt import Bcrypt
 
+# Local imports
+from crypto import encrypt_file_password, decrypt_file_password
+from helpers import is_strong_password, get_db_connection
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Global constants
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
 
-
+# Initialize Flask app and extensions
 app = Flask(__name__)
 CORS(app)
+bcrypt = Bcrypt(app)
 
+# --------- Routes ---------
 @app.route('/health', methods=['GET'])
 def health():
     return 'I am alive!'
+
+
+@app.route('/register', methods=['POST'])
+def register():
+    # Get the email and password from the request
+    email = request.form.get('email')
+    password = request.form.get('password')
+
+    # Check if email and password are provided
+    if not email or not password:
+        return jsonify({'error': 'Email and password are required'}), 400
+    
+    # Validate password strength
+    if not is_strong_password(password):
+        return jsonify({'error': 'Password must be at least 8 characters long and include uppercase, lowercase, digits, and special characters'}), 400
+
+    # Hash the password before storing it in the database
+    hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+
+    # Connect and check if database connection is successful
+    connection = get_db_connection()
+    if connection is None:
+        return jsonify({'error': 'Could not connect to the database'}), 500
+    
+    with connection:
+        with connection.cursor() as cursor:
+            # Check if email already exists
+            cursor.execute("SELECT id FROM users WHERE email = %s", [email])
+            if cursor.fetchone():
+                return jsonify({'error': 'Email already exists'}), 409
+            
+            # Insert the new user into the database
+            cursor.execute("INSERT INTO users (email, password_hash) VALUES (%s, %s)", [email, hashed_password])
+
+    return jsonify({'message': f'{email} registered successfully!'}), 201
+
 
 @app.route('/encrypt', methods=['POST'])
 def encrypt():
