@@ -6,6 +6,7 @@ from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from dotenv import load_dotenv
 from flask_bcrypt import Bcrypt
+from flask_jwt_extended import JWTManager, create_access_token
 
 # Local imports
 from crypto import encrypt_file_password, decrypt_file_password
@@ -20,12 +21,51 @@ UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
 # Initialize Flask app and extensions
 app = Flask(__name__)
 CORS(app)
+app.config["JWT_SECRET_KEY"] = os.getenv('JWT_SECRET_KEY')
 bcrypt = Bcrypt(app)
+jwt = JWTManager(app)
 
 # --------- Routes ---------
 @app.route('/health', methods=['GET'])
 def health():
     return 'I am alive!'
+
+@app.route('/login', methods=['POST'])
+def login():
+    # Get the email and password from the request
+    email = request.form.get('email')
+    password = request.form.get('password')
+    
+    # Check if email and password are provided
+    if not email or not password:
+        return jsonify({'error': 'Email and password are required'}), 400
+    
+    # Connect to database
+    connection = get_db_connection()
+    if connection is None:
+        return jsonify({'error': 'Could not connect to the database'}), 500
+
+    # Check if email exists in database
+    with connection:
+        with connection.cursor() as cursor:
+            
+            cursor.execute("SELECT password_hash FROM users WHERE email = %s", [email])
+
+            query = cursor.fetchone()
+            # Check if email exists in database
+            if query == None:
+                return jsonify({'error': 'Invalid email or password'}), 401
+            
+            # Compare password with stored hash in database
+            dbpassword = query[0]
+            isMatch = bcrypt.check_password_hash(dbpassword, password)
+            if not isMatch:
+                return jsonify({'error': 'Invalid email or password'}), 401
+    
+    # Create JWT Token and return it to client
+    access_token = create_access_token(identity=email)
+    return jsonify(access_token=access_token), 200
+    
 
 
 @app.route('/register', methods=['POST'])
