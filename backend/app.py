@@ -6,7 +6,7 @@ from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from dotenv import load_dotenv
 from flask_bcrypt import Bcrypt
-from flask_jwt_extended import JWTManager, create_access_token
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required
 
 # Local imports
 from crypto import encrypt_file_password, decrypt_file_password
@@ -95,7 +95,7 @@ def register():
             # Check if email already exists
             cursor.execute("SELECT id FROM users WHERE email = %s", [email])
             if cursor.fetchone():
-                return jsonify({'error': 'Email already exists'}), 409
+                return jsonify({'error': 'The email may already be in use, or the data is invalid. Please try logging in.'}), 409
             
             # Insert the new user into the database
             cursor.execute("INSERT INTO users (email, password_hash) VALUES (%s, %s)", [email, hashed_password])
@@ -104,6 +104,7 @@ def register():
 
 
 @app.route('/encrypt', methods=['POST'])
+@jwt_required()
 def encrypt():
     # Get the uploaded file and password from the request
     file = request.files.get('file')
@@ -129,6 +130,7 @@ def encrypt():
 
 
 @app.route('/decrypt', methods=['POST'])
+@jwt_required()
 def decrypt():
     # Get the uploaded file and password from the request
     file = request.files.get('file')
