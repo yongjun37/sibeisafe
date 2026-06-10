@@ -1,4 +1,5 @@
 import baseURL from '../config.js'
+import { setItem, getItem } from '../utils/localStorage.js'
 
 function Encrypt() {
   async function handleEncrypt(e) {
