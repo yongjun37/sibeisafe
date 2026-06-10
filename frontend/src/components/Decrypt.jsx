@@ -1,12 +1,22 @@
-import baseURL from './config.js'
+import baseURL from '../config.js'
+import { setItem, getItem } from '../utils/localStorage.js'
 
 function Decrypt() {
   async function handleDecrypt(e) {
     e.preventDefault()
 
+    const jwt_token = getItem('jwt_token');
+    if (jwt_token == undefined) {
+      alert("Invalid Token/Token does not exist")
+      return;
+    }
+
     // Fetch the decrypted file from the backend
     const response = await fetch(baseURL + '/decrypt', {
       method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${jwt_token}`
+      },
       body: new FormData(e.target)
     })
 

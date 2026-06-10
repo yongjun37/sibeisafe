@@ -1,13 +1,13 @@
-import './App.css'
-import Encrypt from './Encrypt.jsx'
-import Decrypt from './Decrypt.jsx'
+import './styles/App.css'
+import Encrypt from './components/Encrypt.jsx'
+import Decrypt from './components/Decrypt.jsx'
 
 function App() {
 
   return (
     <>
-      <Encrypt />
-      <Decrypt />
+        <Encrypt />
+        <Decrypt />
     </>
   )
 }

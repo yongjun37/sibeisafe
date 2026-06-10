@@ -1,12 +1,21 @@
-import baseURL from './config.js'
+import baseURL from '../config.js'
 
 function Encrypt() {
   async function handleEncrypt(e) {
     e.preventDefault()
 
+    const jwt_token = getItem('jwt_token');
+        if (jwt_token == undefined) {
+          alert("Invalid Token/Token does not exist")
+          return;
+        }
+
     // Fetch the encrypted file from the backend
     const response = await fetch(baseURL + '/encrypt', {
       method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${jwt_token}`
+      },
       body: new FormData(e.target)
     })
 
@@ -29,7 +38,6 @@ function Encrypt() {
     document.body.removeChild(link)
     
     URL.revokeObjectURL(url)
-
   }
 
   return (
