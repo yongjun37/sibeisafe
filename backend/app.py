@@ -6,7 +6,9 @@ from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from dotenv import load_dotenv
 from flask_bcrypt import Bcrypt
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required
+from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity, jwt_required
+import boto3
+from werkzeug.utils import secure_filename
 
 # Local imports
 from crypto import encrypt_file_password, decrypt_file_password
@@ -24,11 +26,13 @@ CORS(app)
 app.config["JWT_SECRET_KEY"] = os.getenv('JWT_SECRET_KEY')
 bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
+s3_client = boto3.client('s3')
 
 # --------- Routes ---------
 @app.route('/health', methods=['GET'])
 def health():
     return 'I am alive!'
+
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -67,7 +71,6 @@ def login():
     return jsonify(access_token=access_token), 200
     
 
-
 @app.route('/register', methods=['POST'])
 def register():
     # Get the email and password from the request
@@ -101,6 +104,77 @@ def register():
             cursor.execute("INSERT INTO users (email, password_hash) VALUES (%s, %s)", [email, hashed_password])
 
     return jsonify({'message': f'{email} registered successfully!'}), 201
+
+
+@app.route('/upload', methods=['POST'])
+@jwt_required()
+def upload():
+    # Get the email of user, uploaded file, and password
+    email = get_jwt_identity()
+    file = request.files.get('file')
+    password = request.form.get('password')
+
+    # Validate file and password
+    if not file or not password:
+        return jsonify({'error': 'File and password are required'}), 400
+    
+    # Get secure filename to prevent directory traversal attacks
+    filename = secure_filename(file.filename)
+    if not filename:
+        return jsonify({'error': 'Invalid file name'}), 400
+    
+    # Define S3 key and bucket
+    s3_key = f"{email}/{filename}.enc"
+    s3_bucket = os.getenv('S3_BUCKET_NAME')
+
+    # Save the uploaded file to the uploads directory
+    input_path = os.path.join(UPLOAD_FOLDER, f'{email}_{filename}')
+    file.save(input_path)
+
+    # Define output path for encrypted file
+    output_path = input_path + '.enc'
+
+    # Try to encrypt and upload file to S3, if anything fails, return an error response and clean up files
+    try:
+        success = encrypt_file_password(input_path, output_path, password)
+    
+        if not success:
+            return jsonify({'error': 'Encryption failed'}), 400
+        
+        s3_client.upload_file(output_path, s3_bucket, s3_key)
+
+    except Exception as e:
+        return jsonify({'error': {str(e)}}), 400
+
+    finally:
+        if os.path.exists(input_path):
+            os.remove(input_path)
+        if os.path.exists(output_path):
+            os.remove(output_path)
+
+    # Connect to database, if connection fails, delete file from S3 and return error response
+    connection = get_db_connection()
+    if connection is None:
+        s3_client.delete_object(Bucket=s3_bucket, Key=s3_key)
+        return jsonify({'error': 'Could not connect to the database'}), 500
+    
+    # Update file metadata in database, if user not found, delete file from S3 and return error response
+    with connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT id FROM users WHERE email = %s", [email])
+            data = cursor.fetchone()
+            if not data:
+                s3_client.delete_object(Bucket=s3_bucket, Key=s3_key)
+                return jsonify({'error': 'User not found'}), 404
+            
+            owner_id = data[0]
+            
+            cursor.execute(
+                "INSERT INTO files (owner_id, filename, s3_key) VALUES (%s, %s, %s)", 
+                [owner_id, filename, s3_key]
+            )
+    
+    return jsonify({'message': 'File uploaded and encrypted successfully!'}), 201
 
 
 @app.route('/encrypt', methods=['POST'])
