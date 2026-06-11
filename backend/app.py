@@ -9,6 +9,7 @@ from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity, jwt_required
 import boto3
 from werkzeug.utils import secure_filename
+from uuid import uuid4
 
 # Local imports
 from crypto import encrypt_file_password, decrypt_file_password
@@ -124,7 +125,7 @@ def upload():
         return jsonify({'error': 'Invalid file name'}), 400
     
     # Define S3 key and bucket
-    s3_key = f"{email}/{filename}.enc"
+    s3_key = f"{email}/{uuid4()}.enc"
     s3_bucket = os.getenv('S3_BUCKET_NAME')
 
     # Save the uploaded file to the uploads directory
