@@ -1,4 +1,4 @@
-# Secure Share
+# Sibei Safe
 A web application allowing for encrypting and decrypting files using AES-256 encryption (Fernet cipher) via password-based encryption.
 
 ## Tech Stack
@@ -113,7 +113,7 @@ python crypto_cli.py verify --in document.pdf --hash a3c5f9e2b1d4c8a7f6e5...
 -  **Frontend and Backend Integration:** Successfully connected the React UI with the Flask encryption engine. 
 
 ## Author's Notes 
-I built SecureShare as a hands-on project to deepen my practical understanding of both full-stack development and secure file handling. Building this tool allowed me to explore several key concepts. 
+I built Sibei Safe as a hands-on project to deepen my practical understanding of both full-stack development and secure file handling. Building this tool allowed me to explore several key concepts. 
 
 ### Concepts Learnt:
 - **Applied Cryptography:** Implementing symmetric encryption, password-based key derivation (PBKDF2), and handling cryptographic failures securely. 
