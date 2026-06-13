@@ -2,7 +2,7 @@
 import os
 
 # Third-party imports
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, jsonify, request, send_file, after_this_request
 from flask_cors import CORS
 from dotenv import load_dotenv
 from flask_bcrypt import Bcrypt
@@ -20,6 +20,7 @@ load_dotenv()
 
 # Global constants
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
+DOWNLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'downloads')
 
 # Initialize Flask app and extensions
 app = Flask(__name__)
@@ -105,6 +106,101 @@ def register():
             cursor.execute("INSERT INTO users (email, password_hash) VALUES (%s, %s)", [email, hashed_password])
 
     return jsonify({'message': f'{email} registered successfully!'}), 201
+
+@app.get('/files')
+@jwt_required()
+def get_files(): 
+    # Get email via JWT Token
+    email = get_jwt_identity()
+
+    # Connect to database
+    connection = get_db_connection()
+    if connection is None:
+        return jsonify({'error': 'Could not connect to the database'}), 500
+    
+    with connection:
+        with connection.cursor() as cursor:
+            # Get user files from database
+            cursor.execute("SELECT f.id, f.filename, f.uploaded_at \
+                            FROM files f  \
+                            JOIN users u ON f.owner_id = u.id \
+                            WHERE u.email = %s", [email])
+            
+            files = cursor.fetchall()
+
+            # If no files return 204 (empty array)
+            if not files:
+                return jsonify(files), 204
+    
+    return jsonify(files), 200
+
+
+@app.route('/download/<file_id>', methods=['GET'])
+@jwt_required()
+def download(file_id):      
+    # Get email via JWT Token
+    email = get_jwt_identity()
+    password = request.form.get('password')
+
+    if not password:
+        return jsonify({'error': 'Password is required'}), 400
+
+    # Connect to database
+    connection = get_db_connection()
+    if connection is None:
+        return jsonify({'error': 'Could not connect to the database'}), 500
+    
+    with connection:
+        with connection.cursor() as cursor:
+            # Explicitly check if email exists as deleted users may still have valid JWT
+            cursor.execute("SELECT id FROM users WHERE email = %s", [email])
+            user_query = cursor.fetchone()
+            if user_query is None:
+                return jsonify({'error': 'User not found'}), 404
+            
+            # Retrieve owner_id
+            owner_id = user_query[0]
+
+            # Get file metadata
+            cursor.execute("SELECT s3_key, filename FROM files WHERE id = %s AND owner_id = %s", [file_id, owner_id])
+            file_query = cursor.fetchone() 
+            if file_query is None:
+                return jsonify({'error': 'File does not exist or not is owned by you'}), 404
+
+            s3_bucket = os.getenv('S3_BUCKET_NAME')
+            s3_key = file_query[0]
+            input_path = os.path.join(DOWNLOAD_FOLDER, file_query[1] + '.enc')
+            output_path = os.path.join(DOWNLOAD_FOLDER, file_query[1])
+
+            # Cleanup files after request
+            @after_this_request
+            def cleanup(response):
+                if os.path.exists(input_path):
+                    os.remove(input_path)
+                if os.path.exists(output_path):
+                    os.remove(output_path)
+                return response
+      
+            # Try to download file from S3 client to save to /downloads folder
+            try:
+                file = s3_client.download_file(s3_bucket, s3_key, input_path)
+
+                success = decrypt_file_password(input_path, output_path, password)
+                if not success: 
+                    return jsonify({'error': 'Wrong password'})
+            
+            # Catch S3 download errors
+            except Exception as e:
+                return jsonify({'error': {str(e)}}), 400
+            
+    return send_file(output_path, as_attachment=True)
+
+
+@app.delete('/files/<file_id>')
+@jwt_required
+def delete_files(file_id): 
+    # TODO: deletes file from S3 and DB
+    return
 
 
 @app.route('/upload', methods=['POST'])
