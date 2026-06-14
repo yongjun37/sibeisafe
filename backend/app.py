@@ -130,9 +130,52 @@ def get_files():
 
             # If no files return 204 (empty array)
             if not files:
-                return jsonify(files), 204
+                return jsonify([]), 200
     
     return jsonify(files), 200
+
+
+@app.delete('/files/<file_id>')
+@jwt_required()
+def delete_files(file_id): 
+    # TODO: deletes file from S3 and DB
+    # Get email via JWT Token
+    email = get_jwt_identity()
+
+    # Connect to database
+    connection = get_db_connection()
+    if connection is None:
+        return jsonify({'error': 'Could not connect to the database'}), 500
+    
+    with connection:
+        with connection.cursor() as cursor:
+            # Explicitly check if email exists as deleted users may still have valid JWT
+            cursor.execute("SELECT id FROM users WHERE email = %s", [email])
+            user_query = cursor.fetchone()
+            if user_query is None:
+                return jsonify({'error': 'User not found'}), 404
+            
+            # Retrieve owner_id
+            owner_id = user_query[0]
+
+            # Get S3 key
+            cursor.execute("SELECT s3_key FROM files WHERE id = %s AND owner_id = %s", [file_id, owner_id])
+            key_query = cursor.fetchone()
+            if key_query is None:
+                return jsonify({'error': 'File does not exist or not is owned by you'}), 404
+            
+            # Retrieve s3_key
+            s3_key = key_query[0]
+            s3_bucket = os.getenv('S3_BUCKET_NAME')
+
+            try: 
+                s3_client.delete_object(Bucket=s3_bucket, Key=s3_key)
+            except Exception as e:
+                return jsonify({'error': str(e)}), 400
+            
+            cursor.execute("DELETE FROM files WHERE id = %s AND owner_id = %s", [file_id, owner_id])
+
+    return jsonify({'message': 'File permanently deleted'}), 200
 
 
 @app.route('/download/<file_id>', methods=['GET'])
@@ -169,8 +212,10 @@ def download(file_id):
 
             s3_bucket = os.getenv('S3_BUCKET_NAME')
             s3_key = file_query[0]
-            input_path = os.path.join(DOWNLOAD_FOLDER, file_query[1] + '.enc')
-            output_path = os.path.join(DOWNLOAD_FOLDER, file_query[1])
+            filename = file_query[1]
+            
+            output_path = os.path.join(DOWNLOAD_FOLDER, str(uuid4()))
+            input_path = output_path + ".enc"
 
             # Cleanup files after request
             @after_this_request
@@ -187,20 +232,13 @@ def download(file_id):
 
                 success = decrypt_file_password(input_path, output_path, password)
                 if not success: 
-                    return jsonify({'error': 'Wrong password'})
+                    return jsonify({'error': 'Wrong password or corrupted file'}), 400
             
             # Catch S3 download errors
             except Exception as e:
-                return jsonify({'error': {str(e)}}), 400
+                return jsonify({'error': str(e)}), 400
             
-    return send_file(output_path, as_attachment=True)
-
-
-@app.delete('/files/<file_id>')
-@jwt_required
-def delete_files(file_id): 
-    # TODO: deletes file from S3 and DB
-    return
+    return send_file(output_path, download_name=filename, as_attachment=True)
 
 
 @app.route('/upload', methods=['POST'])
@@ -261,7 +299,7 @@ def upload():
                 s3_client.upload_file(output_path, s3_bucket, s3_key)
 
             except Exception as e:
-                return jsonify({'error': {str(e)}}), 400
+                return jsonify({'error': str(e)}), 400
 
             finally:
                 if os.path.exists(input_path):
@@ -277,57 +315,6 @@ def upload():
     
     return jsonify({'message': 'File uploaded and encrypted successfully!'}), 201
 
-
-@app.route('/encrypt', methods=['POST'])
-@jwt_required()
-def encrypt():
-    # Get the uploaded file and password from the request
-    file = request.files.get('file')
-    password = request.form.get('password')
-
-    if not file or not password:
-        return jsonify({'error': 'File and password are required'}), 400
-
-    # Get the paths of input and output files
-    input_path = os.path.join(UPLOAD_FOLDER, file.filename)
-    output_path = os.path.join(UPLOAD_FOLDER, f'enc_{file.filename}')
-    
-    # Save file to uploads directory
-    file.save(input_path)
-
-    # Encrypt the file using the provided password
-    success = encrypt_file_password(input_path, output_path, password)
-
-    if not success:
-        return jsonify({'error': 'Encryption failed'}), 400
-    
-    return send_file(output_path, as_attachment=True)
-
-
-@app.route('/decrypt', methods=['POST'])
-@jwt_required()
-def decrypt():
-    # Get the uploaded file and password from the request
-    file = request.files.get('file')
-    password = request.form.get('password')
-
-    if not file or not password:
-        return jsonify({'error': 'File and password are required'}), 400
-
-    # Get the input and output paths
-    input_path = os.path.join(UPLOAD_FOLDER, file.filename)
-    output_path = os.path.join(UPLOAD_FOLDER, f'dec_{file.filename}')
-
-    # Save the uploaded file to the uploads directory
-    file.save(input_path)
-
-    # Decrypt the file using the provided password
-    success = decrypt_file_password(input_path, output_path, password)
-
-    if not success:
-        return jsonify({'error': 'Decryption failed. Wrong password or corrupted file.'}), 400
-        
-    return send_file(output_path, as_attachment=True)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
