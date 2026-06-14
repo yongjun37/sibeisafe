@@ -221,50 +221,55 @@ def upload():
         return jsonify({'error': 'Invalid file name'}), 400
 
     # Save the uploaded file to the uploads directory
-    input_path = os.path.join(UPLOAD_FOLDER, f'{email}_{filename}')
+    input_path = os.path.join(UPLOAD_FOLDER, str(uuid4()))
     file.save(input_path)
 
     # Define output path for encrypted file
     output_path = input_path + '.enc'
 
-    # Try to encrypt and upload file to S3, if anything fails, return an error response and clean up files
-    try:
-        success = encrypt_file_password(input_path, output_path, password)
-    
-        if not success:
-            return jsonify({'error': 'Encryption failed'}), 400
-        
-        s3_client.upload_file(output_path, s3_bucket, s3_key)
-
-    except Exception as e:
-        return jsonify({'error': {str(e)}}), 400
-
-    finally:
-        if os.path.exists(input_path):
-            os.remove(input_path)
-        if os.path.exists(output_path):
-            os.remove(output_path)
-
-    # Connect to database, if connection fails, delete file from S3 and return error response
+    # Connect to database, if connection fails, clean up local files and exit
     connection = get_db_connection()
     if connection is None:
-        s3_client.delete_object(Bucket=s3_bucket, Key=s3_key)
+        if os.path.exists(input_path):
+            os.remove(input_path)
         return jsonify({'error': 'Could not connect to the database'}), 500
     
-    # Update file metadata in database, if user not found, delete file from S3 and return error response
+    
     with connection:
         with connection.cursor() as cursor:
+            # Verify email exists and retrieve user id
             cursor.execute("SELECT id FROM users WHERE email = %s", [email])
             data = cursor.fetchone()
             if not data:
-                s3_client.delete_object(Bucket=s3_bucket, Key=s3_key)
+                if os.path.exists(input_path):
+                    os.remove(input_path)
                 return jsonify({'error': 'User not found'}), 404
             
             owner_id = data[0]
+
             # Define S3 key and bucket
             s3_key = f"{owner_id}/{uuid4()}.enc"
             s3_bucket = os.getenv('S3_BUCKET_NAME')
+
+            # Try to encrypt and upload file to S3, if anything fails, return an error response and clean up files
+            try:
+                success = encrypt_file_password(input_path, output_path, password)
             
+                if not success:
+                    return jsonify({'error': 'Encryption failed'}), 400
+                
+                s3_client.upload_file(output_path, s3_bucket, s3_key)
+
+            except Exception as e:
+                return jsonify({'error': {str(e)}}), 400
+
+            finally:
+                if os.path.exists(input_path):
+                    os.remove(input_path)
+                if os.path.exists(output_path):
+                    os.remove(output_path)
+            
+            # Insert metadata into database
             cursor.execute(
                 "INSERT INTO files (owner_id, filename, s3_key) VALUES (%s, %s, %s)", 
                 [owner_id, filename, s3_key]
