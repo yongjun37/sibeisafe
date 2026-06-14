@@ -219,10 +219,6 @@ def upload():
     filename = secure_filename(file.filename)
     if not filename:
         return jsonify({'error': 'Invalid file name'}), 400
-    
-    # Define S3 key and bucket
-    s3_key = f"{email}/{uuid4()}.enc"
-    s3_bucket = os.getenv('S3_BUCKET_NAME')
 
     # Save the uploaded file to the uploads directory
     input_path = os.path.join(UPLOAD_FOLDER, f'{email}_{filename}')
@@ -265,6 +261,9 @@ def upload():
                 return jsonify({'error': 'User not found'}), 404
             
             owner_id = data[0]
+            # Define S3 key and bucket
+            s3_key = f"{owner_id}/{uuid4()}.enc"
+            s3_bucket = os.getenv('S3_BUCKET_NAME')
             
             cursor.execute(
                 "INSERT INTO files (owner_id, filename, s3_key) VALUES (%s, %s, %s)", 
