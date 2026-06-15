@@ -197,7 +197,7 @@ def delete_files(file_id):
     return jsonify({'message': 'File permanently deleted'}), 200
 
 
-@app.route('/download/<file_id>', methods=['GET'])
+@app.route('/download/<file_id>', methods=['POST'])
 @jwt_required()
 def download(file_id):      
     # Get email via JWT Token
