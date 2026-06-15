@@ -30,6 +30,25 @@ bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
 s3_client = boto3.client('s3')
 
+# Normalize JWT Error
+@jwt.unauthorized_loader
+def missing_token_callback(error):
+    return jsonify({
+        'error': 'Missing authorization token. Please log in.'
+    }), 401
+
+@jwt.invalid_token_loader
+def invalid_token_callback(error):
+    return jsonify({
+        'error': 'Invalid authorization token. Please log in again.'
+    }), 422
+
+@jwt.expired_token_loader
+def expired_token_callback(jwt_header, jwt_payload):
+    return jsonify({
+        'error': 'Your session has expired. Please log in again.'
+    }), 401
+
 # --------- Routes ---------
 @app.route('/health', methods=['GET'])
 def health():
