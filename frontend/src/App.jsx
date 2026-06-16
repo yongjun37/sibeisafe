@@ -14,7 +14,7 @@ function App() {
   };
 
   return (
-    <>
+    <div className="d-flex flex-column min-vh-100">
       {/* Standard Navbar on all pages */}
       <Navbar bg="dark" variant="dark" className="mb-4 shadow-sm">
         <Container>
@@ -34,7 +34,17 @@ function App() {
         {/* Pages displayed here */}
         <Outlet />
       </Container>
-    </>
+
+      {/* Simple, clean footer */}
+      <footer className="bg-light text-center text-muted py-4 mt-auto border-top">
+        <Container>
+          <small>
+            <strong>SibeiSafe</strong> is a technical portfolio project built for educational purposes.
+            Please do not upload actual sensitive personal, medical, or financial data.
+          </small>
+        </Container>
+      </footer>
+    </div>
   );
 }
 
