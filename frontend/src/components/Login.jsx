@@ -1,6 +1,7 @@
 import baseURL from '../config.js'
 import { useNavigate } from 'react-router-dom';
-import { setItem, getItem } from '../utils/localStorage.js'
+import { setItem, getItem } from '../utils/localStorage.js';
+import { Link } from 'react-router-dom';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -36,6 +37,9 @@ export default function Login() {
                  placeholder='Password'/>
           <button type='submit'>Log In</button>
         </form>
+        <p>
+          Don't have an account? <Link to="/register">Register</Link>
+        </p>
     </>
   );
 }

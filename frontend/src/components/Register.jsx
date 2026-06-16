@@ -34,6 +34,9 @@ export default function Register() {
                  placeholder='Password'/>
           <button type='submit'>Create Account</button>
         </form>
+        <p>
+          Already have an account? <Link to="/login">Login</Link>
+        </p>
     </>
   );
 }
