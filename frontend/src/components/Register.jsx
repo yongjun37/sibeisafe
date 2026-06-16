@@ -14,10 +14,11 @@ export default function Register() {
     
     if (response.ok) {
       navigate('/login');
+      
     } else {
       const errorData = await response.json();
       alert(`Register failed: ${errorData.error}`);
-      return;
+    
     }
   }
 

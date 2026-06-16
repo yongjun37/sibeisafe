@@ -17,11 +17,11 @@ export default function Login() {
       const data = await response.json();
       setItem('jwt_token', data.access_token);
       navigate('/');
-      return;
+
     } else {
       const errorData = await response.json();
       alert(`Login failed: ${errorData.error}`);
-      return;
+      
     }
   }
   return (

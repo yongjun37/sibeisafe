@@ -13,3 +13,11 @@ export function getItem(key) {
         console.log(error);
     }
 }
+
+export function removeItem(key) {
+    try {
+        window.localStorage.removeItem(key);
+    } catch(error) {
+        console.error("Error removing from localStorage", error);
+    }
+}
