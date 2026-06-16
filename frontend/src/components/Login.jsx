@@ -1,7 +1,6 @@
 import baseURL from '../config.js'
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { setItem, getItem } from '../utils/localStorage.js';
-import { Link } from 'react-router-dom';
 
 export default function Login() {
   const navigate = useNavigate();
