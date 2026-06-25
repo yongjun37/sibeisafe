@@ -1,9 +1,16 @@
+import '../styles/App.css';
+
 import { useEffect, useState } from "react"
-import baseURL from "../config";
 import { getItem } from "../utils/localStorage"
 import { useResolvedPath } from "react-router-dom";
+
+import baseURL from "../config";
 import DownloadForm from "./DownloadForm"
 import UploadForm from "./UploadForm";
+
+import Dropdown from 'react-bootstrap/Dropdown';
+import { BsDownload, BsTrash, BsShare } from "react-icons/bs";
+
 
 function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
@@ -145,22 +152,33 @@ function Dashboard() {
 					{filename}
 				</div>
 				<div className="d-flex gap-2 align-items-center">
-          {/* Button updates setSelectedFile which opens a modal */}
-					<button className="btn btn-primary btn-sm" 
-									type="button"
-									onClick={(e) => {
+					<Dropdown>
+						<Dropdown.Toggle className="caret-off meatball-btn bg-transparent border-0 text-secondary shadow-none fs-5" type='button'>
+							&#8942;
+						</Dropdown.Toggle>
+
+						<Dropdown.Menu>
+							<Dropdown.Item 
+								onClick={(e) => {
 										e.stopPropagation()
 										setSelectedFile({ id: id, name: filename })
-									}}>
-						Download
-					</button>
+									}}
+							>
+								<BsDownload className="me-2" />Download
+							</Dropdown.Item>
+							<Dropdown.Item 
+								onClick={() => alert("share")}
+							>
+								<BsShare className='me-2' />Share
+							</Dropdown.Item>
+							<Dropdown.Item 
+								onClick={(e) => handleDelete(id, e)}
+							>
+								<BsTrash className="me-2" />Delete
+							</Dropdown.Item>
+						</Dropdown.Menu>
+					</Dropdown>
 
-          {/* Button calls the handleDelete function upon click */}
-					<button className="btn btn-danger btn-sm" 
-					        type="button"
-									onClick={(e) => handleDelete(id, e)}>
-						Delete
-					</button>
 
 				</div>
 			</li>

@@ -1,0 +1,19 @@
+.caret-off::after {
+  display: none !important;
+}
+
+/* Modern circular hover effect for the meatball menu */
+.meatball-btn {
+  border-radius: 50%;            /* Makes the hover background a perfect circle */
+  width: 35px;                   /* Fixed width */
+  height: 35px;                  /* Fixed height */
+  padding: 0 !important;         /* Strips default Bootstrap padding */
+  display: inline-flex;          /* Centers the dots perfectly inside the circle */
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease; /* Smooth fade in/out */
+}
+
+.meatball-btn:hover, .meatball-btn:focus {
+  background-color: rgba(0, 0, 0, 0.08) !important; /* Subtle transparent grey */
+}
