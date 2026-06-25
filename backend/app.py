@@ -197,6 +197,124 @@ def delete_files(file_id):
     return jsonify({'message': 'File permanently deleted'}), 200
 
 
+@app.post('/files/<file_id>/share')
+@jwt_required()
+def share_files(file_id):
+    # Get email via JWT Token
+    email = get_jwt_identity()
+
+    # Connect to database
+    connection = get_db_connection()
+    if connection is None:
+        return jsonify({'error': 'Could not connect to the database'}), 500
+    
+    with connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT id FROM users WHERE email = %s", [email])
+            user_query = cursor.fetchone()
+            if user_query is None:
+                return jsonify({'error': 'User not found'}), 404
+            
+            # Retrieve owner_id
+            owner_id = user_query[0]
+
+            cursor.execute('SELECT share_uuid FROM files WHERE id = %s AND owner_id = %s', [file_id, owner_id])
+            share_query = cursor.fetchone()
+            if share_query is None or share_query[0] is None:
+                # Set new uuid into database
+                share_uuid = str(uuid4())
+
+                cursor.execute("UPDATE files SET share_uuid = %s WHERE id = %s AND owner_id = %s", [share_uuid, file_id, owner_id])
+                if cursor.rowcount == 0:
+                    return jsonify({'error': 'File does not exist or not is owned by you'}), 404
+            else:
+                share_uuid = share_query[0]
+            
+            return jsonify({'message': 'Link Generated!', 'share_id': share_uuid})
+
+
+@app.delete('/files/<file_id>/share')
+@jwt_required()
+def stop_share_files(file_id):
+    # Get email via JWT Token
+    email = get_jwt_identity()
+
+    # Connect to database
+    connection = get_db_connection()
+    if connection is None:
+        return jsonify({'error': 'Could not connect to the database'}), 500
+    
+    with connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT id FROM users WHERE email = %s", [email])
+            user_query = cursor.fetchone()
+            if user_query is None:
+                return jsonify({'error': 'User not found'}), 404
+            
+            # Retrieve owner_id
+            owner_id = user_query[0]
+
+            # Set uuid back to NULL
+            cursor.execute("UPDATE files SET share_uuid = NULL WHERE id = %s AND owner_id = %s", [file_id, owner_id])
+            if cursor.rowcount == 0:
+                return jsonify({'error': 'File does not exist or not is owned by you'}), 404
+            
+            return jsonify({'message': 'Sharing Stopped'})
+
+
+@app.post('/share/<share_id>')
+def download_share_files(share_id):
+    password = request.form.get('password')
+    if not password:
+        return jsonify({'error': 'Password is required'}), 400
+
+    connection = get_db_connection()
+    if connection is None:
+        return jsonify({'error': 'Could not connect to the database'}), 500
+    
+    with connection:
+        with connection.cursor() as cursor:
+            # Get file metadata
+            cursor.execute("SELECT s3_key, filename FROM files WHERE share_uuid = %s", [share_id])
+            file_query = cursor.fetchone() 
+            if file_query is None:
+                return jsonify({'error': 'File does not exist or not is owned by you'}), 404
+
+            s3_bucket = os.getenv('S3_BUCKET_NAME')
+            s3_key = file_query[0]
+            filename = file_query[1]
+            
+            output_path = os.path.join(DOWNLOAD_FOLDER, str(uuid4()))
+            input_path = output_path + ".enc"
+
+            # Cleanup files after request
+            @after_this_request
+            def cleanup(response):
+                if os.path.exists(input_path):
+                    os.remove(input_path)
+                if os.path.exists(output_path):
+                    os.remove(output_path)
+                return response
+      
+            # Try to download file from S3 client to save to /downloads folder
+            try:
+                file = s3_client.download_file(s3_bucket, s3_key, input_path)
+
+                success = decrypt_file_password(input_path, output_path, password)
+                if not success: 
+                    return jsonify({'error': 'Wrong password or corrupted file'}), 400
+            
+            # Catch S3 download errors
+            except Exception as e:
+                return jsonify({'error': str(e)}), 400
+            
+    return send_file(output_path, download_name=filename, as_attachment=True)
+
+
+
+    
+
+
 @app.route('/download/<file_id>', methods=['POST'])
 @jwt_required()
 def download(file_id):      
