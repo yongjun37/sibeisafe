@@ -45,7 +45,10 @@ export default function PublicDownload() {
       const header = response.headers.get('Content-Disposition');
       let filename = 'secure_download';
       if (header && header.includes('filename=')) {
-        filename = header.split('filename=')[1].replace(/"/g, '');
+        const cleanheader = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(header);
+        if (cleanheader != null && cleanheader[1]) { 
+          filename = cleanheader[1].replace(/['"]/g, '');
+        }
       }
 
       const blob = await response.blob();
