@@ -7,9 +7,7 @@ import { useResolvedPath } from "react-router-dom";
 import baseURL from "../config";
 import DownloadForm from "./DownloadForm"
 import UploadForm from "./UploadForm";
-
-import Dropdown from 'react-bootstrap/Dropdown';
-import { BsDownload, BsTrash, BsShare } from "react-icons/bs";
+import FileListItem from './FileListItem';
 
 
 function Dashboard() {
@@ -42,7 +40,7 @@ function Dashboard() {
       }
 
 			// Update state variable
-      setFiles(data)
+      setFiles(data);
 
 			return data;
 
@@ -58,88 +56,9 @@ function Dashboard() {
     }
   }
 
-  // Delete file upon pressing delete button
-	async function handleDelete(id, e){
-		e.stopPropagation();
-		try {
-			const response = await fetch(`${baseURL}/files/${id}`, {
-					method: 'DELETE',
-					headers: {
-							'Authorization': `Bearer ${getItem('jwt_token')}`
-					}
-				});
-
-			// Parse response
-			const data = await response.json();
-
-			// if HTTP code is not 2xx show error message
-      if (!response.ok) {
-        alert(`File fetch failed: ${data.error}`);
-        return;
-      }
-
-			// Refresh UI
-			getFiles();
-
-      // Show success message
-			alert(`Deletion Success: ${data.message}`);
-
-		} catch (error) {
-      // Log error in console
-			console.error("Network error:", error);
-			return;
-		}
-	}
-
-  // Return a <li> of a file with the download and delete buttons
-	function displayFiles(file) {
-		const id = file[0];
-		const filename = file[1];
-		const upload_time = file[2];
-
-		return (
-			<li key={id} className="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-				<div className="fw-bold flex-grow-1">
-					{filename}
-				</div>
-
-				<div className="d-flex gap-2 align-items-center">
-					<Dropdown>
-						<Dropdown.Toggle className="caret-off meatball-btn bg-transparent border-0 text-secondary shadow-none fs-5" type='button'>
-							&#8942;
-						</Dropdown.Toggle>
-						<Dropdown.Menu>
-							<Dropdown.Item 
-								onClick={(e) => {
-										e.stopPropagation()
-										setSelectedFile({ id: id, name: filename })
-									}}
-							>
-								<BsDownload className="me-2" />Download
-							</Dropdown.Item>
-
-							<Dropdown.Item 
-								onClick={() => alert("share")}
-							>
-								<BsShare className='me-2' />Share
-							</Dropdown.Item>
-
-							<Dropdown.Item 
-								onClick={(e) => handleDelete(id, e)}
-							>
-								<BsTrash className="me-2" />Delete
-							</Dropdown.Item>
-
-						</Dropdown.Menu>
-					</Dropdown>
-				</div>
-			</li>
-		)
-	}
-
   // Get the list of files upon initial render
   useEffect(() => {
-    getFiles()
+    getFiles();
   }, [])
 
 
@@ -150,8 +69,8 @@ function Dashboard() {
         {/* Show upload form upon button click */}
 				<button className="p-2 btn btn-primary btn-sm align-self-center"
 				        onClick={(e) => {
-										e.stopPropagation()
-										setShowUploadForm(true)
+										e.stopPropagation();
+										setShowUploadForm(true);
 								}}>
 					Upload
 				</button>
@@ -168,7 +87,14 @@ function Dashboard() {
 					: files.length === 0
 						? <p className="text-center text-muted mt-4">No existing files.</p>
 						: <ul className="list-group shadow-sm">
-								{files.map((f) => displayFiles(f))}
+								{files.map((file) => 
+                  <FileListItem
+                    key={file[0]}
+                    file={file}
+                    onDownload={setSelectedFile}
+                    onShare={}
+                    getFiles={getFiles}
+                  />)}
 							</ul>
 			}
 
