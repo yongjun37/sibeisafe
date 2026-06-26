@@ -38,7 +38,7 @@ export default function DownloadForm({ filename, fileid, ...props}) {
 				const errorData = await response.json();
 				alert(`Download failed: ${errorData.error}`);
 				return;
-    		}
+    	}
 
 			const url = URL.createObjectURL(await response.blob());
 			const link = document.createElement('a');
@@ -66,6 +66,10 @@ export default function DownloadForm({ filename, fileid, ...props}) {
 	
     <Modal // Modal popup for a download form
       {...props}
+      onHide={() => {
+        setPassword('');
+        props.onHide();
+      }}
       size="lg"
       aria-labelledby="contained-modal-title-vcenter"
       centered
@@ -73,7 +77,7 @@ export default function DownloadForm({ filename, fileid, ...props}) {
 			<Form onSubmit={handleSubmit}>
 				<Modal.Header closeButton>
 					<Modal.Title id="contained-modal-title-vcenter">
-						Download {filename}?
+						Download: {filename}
 					</Modal.Title>
 				</Modal.Header>
 
