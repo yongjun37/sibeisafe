@@ -17,6 +17,7 @@ function Dashboard() {
   const [files, setFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
   const [showUploadForm, setShowUploadForm] = useState(false);
+  const [sharedFile, setSharedFile] = useState(null);
 
 
   // Get list of user's files from API
@@ -90,56 +91,6 @@ function Dashboard() {
 		}
 	}
 
-
-  // Download the file upon download button press
-	async function handleDownload(id, filename, password) {
-		try {
-			// Create new form data with password
-			const formData = new FormData();
-			formData.append('password', password);
-
-			// Fetch the encrypted file from the backend
-			const response = await fetch(`${baseURL}/download/${id}`, {
-				method: 'POST',
-				headers: {
-					'Authorization': `Bearer ${getItem('jwt_token')}`
-				},
-				body: formData
-			})
-
-			// Check if response is good
-			if (!response.ok) {
-				const errorData = await response.json();
-				alert(`Download failed: ${errorData.error}`);
-				return;
-    	}
-
-			// Create a download link for the encrypted file
-			const url = URL.createObjectURL(await response.blob())
-
-      // Create temp element
-			const link = document.createElement('a')
-			link.href = url
-			link.download = filename
-
-      // Download file using temp link element
-			document.body.appendChild(link)
-			link.click()
-			document.body.removeChild(link)
-			
-      // Remove temp element
-			URL.revokeObjectURL(url)
-
-      // Return success message
-			alert('Download success')
-
-		} catch (error) {
-      // Log error in console
-			console.error("Network error:", error);
-			return;
-		}
-	}
-
   // Return a <li> of a file with the download and delete buttons
 	function displayFiles(file) {
 		const id = file[0];
@@ -151,12 +102,12 @@ function Dashboard() {
 				<div className="fw-bold flex-grow-1">
 					{filename}
 				</div>
+
 				<div className="d-flex gap-2 align-items-center">
 					<Dropdown>
 						<Dropdown.Toggle className="caret-off meatball-btn bg-transparent border-0 text-secondary shadow-none fs-5" type='button'>
 							&#8942;
 						</Dropdown.Toggle>
-
 						<Dropdown.Menu>
 							<Dropdown.Item 
 								onClick={(e) => {
@@ -166,20 +117,21 @@ function Dashboard() {
 							>
 								<BsDownload className="me-2" />Download
 							</Dropdown.Item>
+
 							<Dropdown.Item 
 								onClick={() => alert("share")}
 							>
 								<BsShare className='me-2' />Share
 							</Dropdown.Item>
+
 							<Dropdown.Item 
 								onClick={(e) => handleDelete(id, e)}
 							>
 								<BsTrash className="me-2" />Delete
 							</Dropdown.Item>
+
 						</Dropdown.Menu>
 					</Dropdown>
-
-
 				</div>
 			</li>
 		)
@@ -205,9 +157,9 @@ function Dashboard() {
 				</button>
 			</div>
       
-			{ // Show spinner while getFiles() is working, 
-        // if no files, return <p>, else return the list of files
-        isLoading 
+			{ /* Show spinner while getFiles() is working, 
+           if no files, return <p>, else return the list of files */}
+      { isLoading 
 					? (<div className="d-flex justify-content-center mt-5">
 								<div className="spinner-border text-primary" role="status">
 									<span className="visually-hidden">Loading...</span>
@@ -225,10 +177,7 @@ function Dashboard() {
 				show={selectedFile !== null}
 				onHide={() => setSelectedFile(null)}
 				filename={selectedFile ? selectedFile.name : ''}
-				handleDownload={(password) => {
-						handleDownload(selectedFile.id, selectedFile.name, password);
-						setSelectedFile(null);
-					}}
+        fileid={selectedFile ? selectedFile.id : ''}
 			/>
 
 			{/* Upload Form Popup */}

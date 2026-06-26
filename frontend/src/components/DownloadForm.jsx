@@ -1,26 +1,65 @@
 import Button from 'react-bootstrap/Button';
 import Modal from 'react-bootstrap/Modal';
 import Form from 'react-bootstrap/Form';
+
 import { useState } from 'react';
 
-export default function DownloadForm({ filename, handleDownload, ...props}) {
+import baseURL from "../config";
+import { getItem } from "../utils/localStorage"
+
+export default function DownloadForm({ filename, fileid, ...props}) {
 	// State to control password input
 	const [password, setPassword] = useState('');
+	const [isDownloading, setIsDownloading] = useState(false);
 
-	function handleSubmit(e) {
+	async function handleSubmit(e) {
 		e.preventDefault();
 
-		// Check if user inputted password
 		if (!password) {
 			alert("Please enter a password.");
       		return;
 		}
 
-		// Call Dashboard's handleDownload
-		handleDownload(password);
+		setIsDownloading(true);
 
-		//Reset password
-		setPassword('');
+		try {
+			const formData = new FormData();
+			formData.append('password', password);
+
+			const response = await fetch(`${baseURL}/download/${fileid}`, {
+				method: 'POST',
+				headers: {
+					'Authorization': `Bearer ${getItem('jwt_token')}`
+				},
+				body: formData
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				alert(`Download failed: ${errorData.error}`);
+				return;
+    		}
+
+			const url = URL.createObjectURL(await response.blob());
+			const link = document.createElement('a');
+			link.href = url;
+			link.download = filename;
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+			URL.revokeObjectURL(url);
+			
+			setPassword('');
+			props.onHide();
+
+		} catch (error) {
+			console.error("Network error:", error);
+			return;
+
+		} finally { 
+			setIsDownloading(false);
+		}
+		
 	}
 
   return (
@@ -46,6 +85,7 @@ export default function DownloadForm({ filename, handleDownload, ...props}) {
 						aria-describedby="passwordHelpBlock"
 						value={password}
 						onChange={(e) => setPassword(e.target.value)}
+						disabled={isDownloading}
 					/>
 					<Form.Text id="passwordHelpBlock" muted>
 						Enter the password you used to encrypt {filename}.
@@ -53,8 +93,8 @@ export default function DownloadForm({ filename, handleDownload, ...props}) {
 				</Modal.Body>
 
 				<Modal.Footer>
-					<Button type='submit'>
-						Decrypt and Download!
+					<Button type='submit' disabled={isDownloading}>
+						{isDownloading ? 'Decrypting...' : 'Decrypt and Download!'}
 					</Button>
 				</Modal.Footer>
 			</Form>	
