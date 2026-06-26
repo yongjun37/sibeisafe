@@ -2,7 +2,6 @@ import '../styles/App.css';
 
 import { useEffect, useState } from "react"
 import { getItem } from "../utils/localStorage"
-import { useResolvedPath } from "react-router-dom";
 
 import baseURL from "../config";
 import DownloadForm from "./DownloadForm"

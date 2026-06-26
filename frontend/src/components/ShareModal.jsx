@@ -85,6 +85,10 @@ export default function ShareModal({ filename, fileid, ...props }) {
 	return (
 		<Modal 
 			{...props} 
+			onHide={() => {
+				setShareLink('');
+				props.onHide();
+			}}
 			size="lg"
       aria-labelledby="contained-modal-title-vcenter"
       centered

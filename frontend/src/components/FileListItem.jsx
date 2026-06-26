@@ -1,5 +1,8 @@
 import { BsDownload, BsTrash, BsShare } from "react-icons/bs";
-import Dropdown from 'react-bootstrap/Dropdown'
+import Dropdown from 'react-bootstrap/Dropdown';
+
+import baseURL from "../config";
+import { getItem } from "../utils/localStorage";
 
 export default function FileListItem({ file, onDownload, onShare, getFiles }) {
 	const id = file[0];
