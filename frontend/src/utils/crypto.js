@@ -58,8 +58,8 @@ export async function encrypt_file(file, password) {
   combinedPayload.set(salt, 0);
   combinedPayload.set(iv, SALT_LEN);
   combinedPayload.set(uint8ciphertext, SALT_LEN + IV_LEN);
-
-  return combinedPayload;
+  
+  return new Blob([combinedPayload], { type: 'application/octet-stream' });
 }
 
 

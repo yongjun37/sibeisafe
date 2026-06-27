@@ -4,6 +4,7 @@ import Form from 'react-bootstrap/Form';
 import { useState } from 'react';
 import baseURL from '../config';
 import { getItem } from '../utils/localStorage';
+import { encrypt_file } from '../utils/crypto';
 
 export default function UploadForm( {onSuccess, ...props} ) {
 	const [password, setPassword] = useState('');
@@ -16,14 +17,15 @@ export default function UploadForm( {onSuccess, ...props} ) {
 		if (!uploadFile || !password) {
       alert("Please select a file and enter a password.");
       return;
-    }
-		
-		// Make form data
-		const formData = new FormData();
-		formData.append('file', uploadFile);
-		formData.append('password', password);
+    }	
 
 		try {
+			const encryptedFile = await encrypt_file(uploadFile, password)
+
+			// Make form data
+			const formData = new FormData();
+			formData.append('file', encryptedFile, uploadFile.name);
+
 			// Upload files into S3
 			const response = await fetch(`${baseURL}/upload`, {
 				method: 'POST',
@@ -46,10 +48,13 @@ export default function UploadForm( {onSuccess, ...props} ) {
 			// Show success message
 			alert(data.message);
 
-		} catch (error) {
-			// Log errors to console
-			console.error("Network error:", error);
-			return;
+		} catch (e) {
+			if (e.name == 'OperationError' || e.name === 'InvalidAccessError') {
+				console.error("Failed to encrypt file:", e);
+				alert("Encryption failed. Please check your file and try again.");
+			}
+			console.error("Network error:", e);
+			alert("An error occurred during upload. Please try again.");
 
 		} finally {
 			// Reset the controlled variables
@@ -94,7 +99,7 @@ export default function UploadForm( {onSuccess, ...props} ) {
 						onChange={(e) => setPassword(e.target.value)}
 					/>
 					<Form.Text id="passwordHelpBlock" muted>
-						Please remember your password, it will be used to retreive your file.
+						Please remember your password, it will be used to retrieve your file.
 					</Form.Text>
 				</Modal.Body>
 
