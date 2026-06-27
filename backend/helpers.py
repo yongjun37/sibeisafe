@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from psycopg2 import connect, OperationalError
+from psycopg2 import pool, OperationalError
 
 load_dotenv()
 
@@ -25,18 +25,26 @@ def is_strong_password(password):
         return False
     return True
 
-def get_db_connection():
-    """
-    Establishes a connection to the PostgreSQL database using credentials from environment variables.
-    
-    Returns:
-        A psycopg2 connection object if successful, or None if there was an error connecting.
-    """
-    db_url = os.getenv('DATABASE_URL')
-    try:
-        connection = connect(db_url)
-        return connection
-    except OperationalError as e:
-        print(f"Error connecting to the database: {e}")
-        return None
+try:
+    db_pool = pool.ThreadedConnectionPool(
+        minconn=1,
+        maxconn=10,
+        dsn=os.getenv('DATABASE_URL')
+    )
+except OperationalError as e:
+    print(f"FATAL: Error creating connection pool: {e}")
+    db_pool = None
 
+def get_db_connection():
+    # Borrows a connection from the pool.
+    if db_pool:
+        try:
+            return db_pool.getconn()
+        except Exception as e:
+            print(f"Unable to get connection from pool: {e}")
+            return None
+
+def release_db_connection(connection):
+    # Returns the connection to the pool so others can use it.
+    if db_pool and connection:
+        db_pool.putconn(connection)

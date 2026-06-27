@@ -13,7 +13,7 @@ from werkzeug.utils import secure_filename
 from uuid import uuid4
 
 # Local imports
-from helpers import is_strong_password, get_db_connection
+from helpers import is_strong_password, get_db_connection, release_db_connection
 
 # Load environment variables from .env file
 load_dotenv()
@@ -46,12 +46,12 @@ def expired_token_callback(jwt_header, jwt_payload):
     }), 401
 
 # --------- Routes ---------
-@app.route('/health', methods=['GET'])
+@app.get('/health')
 def health():
     return 'I am alive!'
 
 
-@app.route('/login', methods=['POST'])
+@app.post('/login')
 def login():
     # Get the email and password from the request
     email = request.form.get('email')
@@ -67,28 +67,31 @@ def login():
         return jsonify({'error': 'Could not connect to the database'}), 500
 
     # Check if email exists in database
-    with connection:
-        with connection.cursor() as cursor:
-            
-            cursor.execute("SELECT password_hash FROM users WHERE email = %s", [email])
+    try:
+        with connection:
+            with connection.cursor() as cursor:
+                
+                cursor.execute("SELECT password_hash FROM users WHERE email = %s", [email])
 
-            query = cursor.fetchone()
-            # Check if email exists in database
-            if query == None:
-                return jsonify({'error': 'Invalid email or password'}), 401
-            
-            # Compare password with stored hash in database
-            dbpassword = query[0]
-            isMatch = bcrypt.check_password_hash(dbpassword, password)
-            if not isMatch:
-                return jsonify({'error': 'Invalid email or password'}), 401
+                query = cursor.fetchone()
+                # Check if email exists in database
+                if query == None:
+                    return jsonify({'error': 'Invalid email or password'}), 401
+                
+                # Compare password with stored hash in database
+                dbpassword = query[0]
+                isMatch = bcrypt.check_password_hash(dbpassword, password)
+                if not isMatch:
+                    return jsonify({'error': 'Invalid email or password'}), 401
+    finally: 
+        release_db_connection(connection)
     
     # Create JWT Token and return it to client
     access_token = create_access_token(identity=email)
     return jsonify(access_token=access_token), 200
     
 
-@app.route('/register', methods=['POST'])
+@app.post('/register')
 def register():
     # Get the email and password from the request
     email = request.form.get('email')
@@ -110,16 +113,19 @@ def register():
     if connection is None:
         return jsonify({'error': 'Could not connect to the database'}), 500
     
-    with connection:
-        with connection.cursor() as cursor:
-            # Check if email already exists
-            cursor.execute("SELECT id FROM users WHERE email = %s", [email])
-            if cursor.fetchone():
-                return jsonify({'error': 'The email may already be in use, or the data is invalid. Please try logging in.'}), 409
-            
-            # Insert the new user into the database
-            cursor.execute("INSERT INTO users (email, password_hash) VALUES (%s, %s)", [email, hashed_password])
-
+    try:
+        with connection:
+            with connection.cursor() as cursor:
+                # Check if email already exists
+                cursor.execute("SELECT id FROM users WHERE email = %s", [email])
+                if cursor.fetchone():
+                    return jsonify({'error': 'The email may already be in use, or the data is invalid. Please try logging in.'}), 409
+                
+                # Insert the new user into the database
+                cursor.execute("INSERT INTO users (email, password_hash) VALUES (%s, %s)", [email, hashed_password])
+    finally:
+        release_db_connection(connection)
+        
     return jsonify({'message': f'{email} registered successfully!'}), 201
 
 @app.get('/files')
@@ -133,19 +139,22 @@ def get_files():
     if connection is None:
         return jsonify({'error': 'Could not connect to the database'}), 500
     
-    with connection:
-        with connection.cursor() as cursor:
-            # Get user files from database
-            cursor.execute("SELECT f.id, f.filename, f.uploaded_at \
-                            FROM files f  \
-                            JOIN users u ON f.owner_id = u.id \
-                            WHERE u.email = %s", [email])
-            
-            files = cursor.fetchall()
+    try:
+        with connection:
+            with connection.cursor() as cursor:
+                # Get user files from database
+                cursor.execute("SELECT f.id, f.filename, f.uploaded_at \
+                                FROM files f  \
+                                JOIN users u ON f.owner_id = u.id \
+                                WHERE u.email = %s", [email])
+                
+                files = cursor.fetchall()
 
-            # If no files return 204 (empty array)
-            if not files:
-                return jsonify([]), 200
+                # If no files return 204 (empty array)
+                if not files:
+                    return jsonify([]), 200
+    finally:
+        release_db_connection(connection)
     
     return jsonify(files), 200
 
@@ -153,7 +162,6 @@ def get_files():
 @app.delete('/files/<file_id>')
 @jwt_required()
 def delete_files(file_id): 
-    # TODO: deletes file from S3 and DB
     # Get email via JWT Token
     email = get_jwt_identity()
 
@@ -162,34 +170,37 @@ def delete_files(file_id):
     if connection is None:
         return jsonify({'error': 'Could not connect to the database'}), 500
     
-    with connection:
-        with connection.cursor() as cursor:
-            # Explicitly check if email exists as deleted users may still have valid JWT
-            cursor.execute("SELECT id FROM users WHERE email = %s", [email])
-            user_query = cursor.fetchone()
-            if user_query is None:
-                return jsonify({'error': 'User not found'}), 404
-            
-            # Retrieve owner_id
-            owner_id = user_query[0]
+    try:
+        with connection:
+            with connection.cursor() as cursor:
+                # Explicitly check if email exists as deleted users may still have valid JWT
+                cursor.execute("SELECT id FROM users WHERE email = %s", [email])
+                user_query = cursor.fetchone()
+                if user_query is None:
+                    return jsonify({'error': 'User not found'}), 404
+                
+                # Retrieve owner_id
+                owner_id = user_query[0]
 
-            # Get S3 key
-            cursor.execute("SELECT s3_key FROM files WHERE id = %s AND owner_id = %s", [file_id, owner_id])
-            key_query = cursor.fetchone()
-            if key_query is None:
-                return jsonify({'error': 'File does not exist or not is owned by you'}), 404
-            
-            # Retrieve s3_key
-            s3_key = key_query[0]
-            s3_bucket = os.getenv('S3_BUCKET_NAME')
+                # Get S3 key
+                cursor.execute("SELECT s3_key FROM files WHERE id = %s AND owner_id = %s", [file_id, owner_id])
+                key_query = cursor.fetchone()
+                if key_query is None:
+                    return jsonify({'error': 'File does not exist or not is owned by you'}), 404
+                
+                # Retrieve s3_key
+                s3_key = key_query[0]
+                s3_bucket = os.getenv('S3_BUCKET_NAME')
 
-            try: 
-                s3_client.delete_object(Bucket=s3_bucket, Key=s3_key)
-            except Exception as e:
-                return jsonify({'error': str(e)}), 400
-            
-            cursor.execute("DELETE FROM files WHERE id = %s AND owner_id = %s", [file_id, owner_id])
-
+                try: 
+                    s3_client.delete_object(Bucket=s3_bucket, Key=s3_key)
+                except Exception as e:
+                    return jsonify({'error': str(e)}), 400
+                
+                cursor.execute("DELETE FROM files WHERE id = %s AND owner_id = %s", [file_id, owner_id])
+    finally:
+        release_db_connection(connection)
+    
     return jsonify({'message': 'File permanently deleted'}), 200
 
 
@@ -204,29 +215,32 @@ def share_files(file_id):
     if connection is None:
         return jsonify({'error': 'Could not connect to the database'}), 500
     
-    with connection:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT id FROM users WHERE email = %s", [email])
-            user_query = cursor.fetchone()
-            if user_query is None:
-                return jsonify({'error': 'User not found'}), 404
-            
-            # Retrieve owner_id
-            owner_id = user_query[0]
+    try:
+        with connection:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT id FROM users WHERE email = %s", [email])
+                user_query = cursor.fetchone()
+                if user_query is None:
+                    return jsonify({'error': 'User not found'}), 404
+                
+                # Retrieve owner_id
+                owner_id = user_query[0]
 
-            cursor.execute('SELECT share_uuid FROM files WHERE id = %s AND owner_id = %s', [file_id, owner_id])
-            share_query = cursor.fetchone()
-            if share_query is None or share_query[0] is None:
-                # Set new uuid into database
-                share_uuid = str(uuid4())
+                cursor.execute('SELECT share_uuid FROM files WHERE id = %s AND owner_id = %s', [file_id, owner_id])
+                share_query = cursor.fetchone()
+                if share_query is None or share_query[0] is None:
+                    # Set new uuid into database
+                    share_uuid = str(uuid4())
 
-                cursor.execute("UPDATE files SET share_uuid = %s WHERE id = %s AND owner_id = %s", [share_uuid, file_id, owner_id])
-                if cursor.rowcount == 0:
-                    return jsonify({'error': 'File does not exist or not is owned by you'}), 404
-            else:
-                share_uuid = share_query[0]
-            
-            return jsonify({'message': 'Link Generated!', 'share_id': share_uuid})
+                    cursor.execute("UPDATE files SET share_uuid = %s WHERE id = %s AND owner_id = %s", [share_uuid, file_id, owner_id])
+                    if cursor.rowcount == 0:
+                        return jsonify({'error': 'File does not exist or not is owned by you'}), 404
+                else:
+                    share_uuid = share_query[0]
+                    
+                return jsonify({'message': 'Link Generated!', 'share_id': share_uuid})
+    finally:
+        release_db_connection(connection)
 
 
 @app.delete('/files/<file_id>/share')
@@ -240,63 +254,72 @@ def stop_share_files(file_id):
     if connection is None:
         return jsonify({'error': 'Could not connect to the database'}), 500
     
-    with connection:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT id FROM users WHERE email = %s", [email])
-            user_query = cursor.fetchone()
-            if user_query is None:
-                return jsonify({'error': 'User not found'}), 404
-            
-            # Retrieve owner_id
-            owner_id = user_query[0]
+    try:
+        with connection:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT id FROM users WHERE email = %s", [email])
+                user_query = cursor.fetchone()
+                if user_query is None:
+                    return jsonify({'error': 'User not found'}), 404
+                
+                # Retrieve owner_id
+                owner_id = user_query[0]
 
-            # Set uuid back to NULL
-            cursor.execute("UPDATE files SET share_uuid = NULL WHERE id = %s AND owner_id = %s", [file_id, owner_id])
-            if cursor.rowcount == 0:
-                return jsonify({'error': 'File does not exist or not is owned by you'}), 404
-            
-            return jsonify({'message': 'Sharing Stopped'})
+                # Set uuid back to NULL
+                cursor.execute("UPDATE files SET share_uuid = NULL WHERE id = %s AND owner_id = %s", [file_id, owner_id])
+                if cursor.rowcount == 0:
+                    return jsonify({'error': 'File does not exist or not is owned by you'}), 404
+                
+                return jsonify({'message': 'Sharing Stopped'})
+    
+    finally:
+        release_db_connection(connection)
+    
+    
 
 
-@app.post('/share/<share_id>')
+@app.get('/share/<share_id>')
 def download_share_files(share_id):
 
     connection = get_db_connection()
     if connection is None:
         return jsonify({'error': 'Could not connect to the database'}), 500
     
-    with connection:
-        with connection.cursor() as cursor:
-            # Get file metadata
-            cursor.execute("SELECT s3_key, filename FROM files WHERE share_uuid = %s", [share_id])
-            file_query = cursor.fetchone() 
-            if file_query is None:
-                return jsonify({'error': 'File does not exist or not is owned by you'}), 404
+    try:
+        with connection:
+            with connection.cursor() as cursor:
+                # Get file metadata
+                cursor.execute("SELECT s3_key, filename FROM files WHERE share_uuid = %s", [share_id])
+                file_query = cursor.fetchone() 
+                if file_query is None:
+                    return jsonify({'error': 'File does not exist or not is owned by you'}), 404
 
-            s3_bucket = os.getenv('S3_BUCKET_NAME')
-            s3_key = file_query[0]
-            filename = file_query[1]
-      
-            # Try to download file from S3 client to save to /downloads folder
-            try:
-                file = io.BytesIO()
+                s3_bucket = os.getenv('S3_BUCKET_NAME')
+                s3_key = file_query[0]
+                filename = file_query[1]
+        
+                # Try to download file from S3 client to save to /downloads folder
+                try:
+                    file = io.BytesIO()
+                    
+                    s3_client.download_fileobj(
+                        s3_bucket, 
+                        s3_key, 
+                        file)
+                    
+                    file.seek(0)
+                    
+                    return send_file(
+                        file, 
+                        mimetype='application/octet-stream', 
+                        as_attachment=True, 
+                        download_name=filename)
                 
-                s3_client.download_fileobj(
-                    s3_bucket, 
-                    s3_key, 
-                    file)
-                
-                file.seek(0)
-                
-                return send_file(
-                    file, 
-                    mimetype='application/octet-stream', 
-                    as_attachment=True, 
-                    download_name=filename)
-            
-            # Catch S3 download errors
-            except Exception as e:
-                return jsonify({'error': str(e)}), 400
+                # Catch S3 download errors
+                except Exception as e:
+                    return jsonify({'error': str(e)}), 400
+    finally:
+        release_db_connection(connection)
 
 
 
@@ -311,46 +334,49 @@ def download(file_id):
     if connection is None:
         return jsonify({'error': 'Could not connect to the database'}), 500
     
-    with connection:
-        with connection.cursor() as cursor:
-            # Explicitly check if email exists as deleted users may still have valid JWT
-            cursor.execute("SELECT id FROM users WHERE email = %s", [email])
-            user_query = cursor.fetchone()
-            if user_query is None:
-                return jsonify({'error': 'User not found'}), 404
-            
-            # Retrieve owner_id
-            owner_id = user_query[0]
+    try:
+        with connection:
+            with connection.cursor() as cursor:
+                # Explicitly check if email exists as deleted users may still have valid JWT
+                cursor.execute("SELECT id FROM users WHERE email = %s", [email])
+                user_query = cursor.fetchone()
+                if user_query is None:
+                    return jsonify({'error': 'User not found'}), 404
+                
+                # Retrieve owner_id
+                owner_id = user_query[0]
 
-            # Get file metadata
-            cursor.execute("SELECT s3_key, filename FROM files WHERE id = %s AND owner_id = %s", [file_id, owner_id])
-            file_query = cursor.fetchone() 
-            if file_query is None:
-                return jsonify({'error': 'File does not exist or not is owned by you'}), 404
+                # Get file metadata
+                cursor.execute("SELECT s3_key, filename FROM files WHERE id = %s AND owner_id = %s", [file_id, owner_id])
+                file_query = cursor.fetchone() 
+                if file_query is None:
+                    return jsonify({'error': 'File does not exist or not is owned by you'}), 404
 
-            s3_bucket = os.getenv('S3_BUCKET_NAME')
-            s3_key = file_query[0]
-            filename = file_query[1]
-            
-            try:
-                file = io.BytesIO()
+                s3_bucket = os.getenv('S3_BUCKET_NAME')
+                s3_key = file_query[0]
+                filename = file_query[1]
                 
-                s3_client.download_fileobj(
-                    s3_bucket, 
-                    s3_key, 
-                    file)
+                try:
+                    file = io.BytesIO()
+                    
+                    s3_client.download_fileobj(
+                        s3_bucket, 
+                        s3_key, 
+                        file)
+                    
+                    file.seek(0)
+                    
+                    return send_file(
+                        file, 
+                        mimetype='application/octet-stream', 
+                        as_attachment=True, 
+                        download_name=filename)
                 
-                file.seek(0)
-                
-                return send_file(
-                    file, 
-                    mimetype='application/octet-stream', 
-                    as_attachment=True, 
-                    download_name=filename)
-            
-            # Catch S3 download errors
-            except Exception as e:
-                return jsonify({'error': str(e)}), 400
+                # Catch S3 download errors
+                except Exception as e:
+                    return jsonify({'error': str(e)}), 400
+    finally:
+        release_db_connection(connection)
 
 
 @app.post('/upload')
@@ -374,36 +400,39 @@ def upload():
     if connection is None:
         return jsonify({'error': 'Could not connect to the database'}), 500
     
-    with connection:
-        with connection.cursor() as cursor:
-            # Verify email exists and retrieve user id
-            cursor.execute("SELECT id FROM users WHERE email = %s", [email])
-            data = cursor.fetchone()
-            if not data:
-                return jsonify({'error': 'User not found'}), 404
-            
-            owner_id = data[0]
+    try:
+        with connection:
+            with connection.cursor() as cursor:
+                # Verify email exists and retrieve user id
+                cursor.execute("SELECT id FROM users WHERE email = %s", [email])
+                data = cursor.fetchone()
+                if not data:
+                    return jsonify({'error': 'User not found'}), 404
+                
+                owner_id = data[0]
 
-            # Define S3 key and bucket
-            s3_key = f"{owner_id}/{uuid4()}.enc"
-            s3_bucket = os.getenv('S3_BUCKET_NAME')
+                # Define S3 key and bucket
+                s3_key = f"{owner_id}/{uuid4()}.enc"
+                s3_bucket = os.getenv('S3_BUCKET_NAME')
 
-            # Try to upload file to S3, if anything fails, return an error response and clean up files
-            try:
-                s3_client.upload_fileobj(
-                    file,
-                    s3_bucket,
-                    s3_key,
-                    ExtraArgs={"ContentType": "application/octet-stream"})
+                # Try to upload file to S3, if anything fails, return an error response and clean up files
+                try:
+                    s3_client.upload_fileobj(
+                        file,
+                        s3_bucket,
+                        s3_key,
+                        ExtraArgs={"ContentType": "application/octet-stream"})
 
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
-            
-            # Insert metadata into database
-            cursor.execute(
-                "INSERT INTO files (owner_id, filename, s3_key) VALUES (%s, %s, %s)", 
-                [owner_id, filename, s3_key]
-            )
+                except Exception as e:
+                    return jsonify({'error': str(e)}), 500
+                
+                # Insert metadata into database
+                cursor.execute(
+                    "INSERT INTO files (owner_id, filename, s3_key) VALUES (%s, %s, %s)", 
+                    [owner_id, filename, s3_key]
+                )
+    finally:
+        release_db_connection(connection)
     
     return jsonify({'message': 'File uploaded successfully!'}), 201
 
