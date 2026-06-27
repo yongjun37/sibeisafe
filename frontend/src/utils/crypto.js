@@ -64,10 +64,13 @@ export async function encrypt_file(file, password) {
 
 
 export async function decrypt_file(encryptedBlob, password) {
-  const salt = encryptedBlob.slice(0, SALT_LEN);
-  const iv =  encryptedBlob.slice(SALT_LEN, SALT_LEN + IV_LEN);
+  const buffer = await encryptedBlob.arrayBuffer();
+  const encryptedBytes = new Uint8Array(buffer);
 
-  const ciphertext = encryptedBlob.slice(SALT_LEN + IV_LEN);
+  const salt = encryptedBytes.slice(0, SALT_LEN);
+  const iv =  encryptedBytes.slice(SALT_LEN, SALT_LEN + IV_LEN);
+
+  const ciphertext = encryptedBytes.slice(SALT_LEN + IV_LEN);
 
   const key = await genKey(password, salt);
 
@@ -80,5 +83,5 @@ export async function decrypt_file(encryptedBlob, password) {
     ciphertext
   );
 
-  return plaintext;
+  return new Blob([plaintext], { type: 'application/octet-stream' });
 }
