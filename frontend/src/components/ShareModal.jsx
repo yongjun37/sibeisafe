@@ -18,7 +18,7 @@ export default function ShareModal({ filename, fileid, ...props }) {
 
 		try {
 			const response = await fetch(`${baseURL}/files/${fileid}/share`, {
-				method: 'POST',
+				method: 'GET',
 				headers: {
 					'Authorization': `Bearer ${getItem('jwt_token')}`
 				}
