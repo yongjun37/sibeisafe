@@ -1,5 +1,3 @@
-import { useState } from 'react';
-import { useParams } from 'react-router-dom';
 import Container from 'react-bootstrap/Container';
 import Card from 'react-bootstrap/Card';
 import Form from 'react-bootstrap/Form';
@@ -8,8 +6,11 @@ import Alert from 'react-bootstrap/Alert';
 
 import baseURL from '../config';
 
+import { useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { decrypt_file } from '../utils/crypto';
+
 export default function PublicDownload() {
-  // 1. Extract the share_id directly from the URL bar
   const { share_id } = useParams();
 
   const [password, setPassword] = useState('');
@@ -18,6 +19,7 @@ export default function PublicDownload() {
 
   async function handleDownload(e) {
     e.preventDefault();
+
     if (!password) {
       setError("Please enter the decryption password.");
       return;
@@ -27,12 +29,8 @@ export default function PublicDownload() {
     setError(null);
 
     try {
-      const formData = new FormData();
-      formData.append('password', password);
-
       const response = await fetch(`${baseURL}/share/${share_id}`, {
-        method: 'POST',
-        body: formData
+        method: 'GET',
       });
 
       if (!response.ok) {
@@ -51,8 +49,11 @@ export default function PublicDownload() {
         }
       }
 
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      const encryptedBlob = await response.blob();
+
+      const file = await decrypt_file(encryptedBlob, password);
+
+      const url = URL.createObjectURL(file);
       const link = document.createElement('a');
       link.href = url;
       link.download = filename;
@@ -63,9 +64,16 @@ export default function PublicDownload() {
 
       setPassword('');
 
-    } catch (error) {
-      console.error("Download Error:", error);
-      setError("A network error occurred while trying to securely download the file.");
+    } catch (e) {
+      if (e.name == 'OperationError' || e.name === 'InvalidAccessError') {
+				console.error("Failed to decrypt file:", e);
+				setError("Decryption failed. Please check your file or password and try again.");
+
+			} else {
+        console.error("Network error:", e);
+			  setError("An error occurred during download. Please try again.");
+      }
+
     } finally {
       setIsDownloading(false);
     }

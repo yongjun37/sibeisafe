@@ -1,46 +1,50 @@
 import Button from 'react-bootstrap/Button';
 import Modal from 'react-bootstrap/Modal';
 import Form from 'react-bootstrap/Form';
-
-import { useState } from 'react';
+import Alert from 'react-bootstrap/Alert'
 
 import baseURL from "../config";
+
+import { useState } from 'react';
 import { getItem } from "../utils/localStorage"
+import { decrypt_file } from '../utils/crypto';
 
 export default function DownloadForm({ filename, fileid, ...props}) {
 	// State to control password input
 	const [password, setPassword] = useState('');
 	const [isDownloading, setIsDownloading] = useState(false);
+	const [error, setError] = useState(null);
 
 	async function handleSubmit(e) {
 		e.preventDefault();
 
 		if (!password) {
-			alert("Please enter a password.");
+			setError("Please enter the decryption password.");
       		return;
 		}
 
 		setIsDownloading(true);
+		setError(null);
 
 		try {
-			const formData = new FormData();
-			formData.append('password', password);
-
 			const response = await fetch(`${baseURL}/download/${fileid}`, {
-				method: 'POST',
+				method: 'GET',
 				headers: {
 					'Authorization': `Bearer ${getItem('jwt_token')}`
-				},
-				body: formData
+				}
 			});
 
 			if (!response.ok) {
 				const errorData = await response.json();
-				alert(`Download failed: ${errorData.error}`);
+				setError(errorData.error);
 				return;
     	}
 
-			const url = URL.createObjectURL(await response.blob());
+			const encryptedBlob = await response.blob()
+													 
+			const file = await decrypt_file(encryptedBlob, password);
+
+			const url = URL.createObjectURL(file);
 			const link = document.createElement('a');
 			link.href = url;
 			link.download = filename;
@@ -52,9 +56,16 @@ export default function DownloadForm({ filename, fileid, ...props}) {
 			setPassword('');
 			props.onHide();
 
-		} catch (error) {
-			console.error("Network error:", error);
-			return;
+		} catch (e) {
+			if (e.name == 'OperationError' || e.name === 'InvalidAccessError') {
+				console.error("Failed to decrypt file:", e);
+				setError("Decryption failed. Please check your file or password and try again.");
+
+			} else {
+				console.error("Network error:", e);
+				setError("An error occurred during download. Please try again.");
+			}
+			
 
 		} finally { 
 			setIsDownloading(false);
@@ -69,6 +80,7 @@ export default function DownloadForm({ filename, fileid, ...props}) {
       onHide={() => {
         setPassword('');
         props.onHide();
+				setError(null);
       }}
       size="lg"
       aria-labelledby="contained-modal-title-vcenter"
@@ -82,6 +94,7 @@ export default function DownloadForm({ filename, fileid, ...props}) {
 				</Modal.Header>
 
 				<Modal.Body>
+					{error && <Alert variant="danger">{error}</Alert>}
 					<Form.Label htmlFor="inputPassword">Password</Form.Label>
 					<Form.Control
 						type="password"
