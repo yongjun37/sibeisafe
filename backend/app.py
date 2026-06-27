@@ -1,8 +1,9 @@
 # Standard library imports
 import os
+import io
 
 # Third-party imports
-from flask import Flask, jsonify, request, send_file, after_this_request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from dotenv import load_dotenv
 from flask_bcrypt import Bcrypt
@@ -12,15 +13,10 @@ from werkzeug.utils import secure_filename
 from uuid import uuid4
 
 # Local imports
-from crypto import encrypt_file_password, decrypt_file_password
 from helpers import is_strong_password, get_db_connection
 
 # Load environment variables from .env file
 load_dotenv()
-
-# Global constants
-UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
-DOWNLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'downloads')
 
 # Initialize Flask app and extensions
 app = Flask(__name__)
@@ -197,7 +193,7 @@ def delete_files(file_id):
     return jsonify({'message': 'File permanently deleted'}), 200
 
 
-@app.post('/files/<file_id>/share')
+@app.get('/files/<file_id>/share')
 @jwt_required()
 def share_files(file_id):
     # Get email via JWT Token
@@ -264,9 +260,6 @@ def stop_share_files(file_id):
 
 @app.post('/share/<share_id>')
 def download_share_files(share_id):
-    password = request.form.get('password')
-    if not password:
-        return jsonify({'error': 'Password is required'}), 400
 
     connection = get_db_connection()
     if connection is None:
@@ -283,47 +276,35 @@ def download_share_files(share_id):
             s3_bucket = os.getenv('S3_BUCKET_NAME')
             s3_key = file_query[0]
             filename = file_query[1]
-            
-            output_path = os.path.join(DOWNLOAD_FOLDER, str(uuid4()))
-            input_path = output_path + ".enc"
-
-            # Cleanup files after request
-            @after_this_request
-            def cleanup(response):
-                if os.path.exists(input_path):
-                    os.remove(input_path)
-                if os.path.exists(output_path):
-                    os.remove(output_path)
-                return response
       
             # Try to download file from S3 client to save to /downloads folder
             try:
-                file = s3_client.download_file(s3_bucket, s3_key, input_path)
-
-                success = decrypt_file_password(input_path, output_path, password)
-                if not success: 
-                    return jsonify({'error': 'Wrong password or corrupted file'}), 400
+                file = io.BytesIO()
+                
+                s3_client.download_fileobj(
+                    s3_bucket, 
+                    s3_key, 
+                    file)
+                
+                file.seek(0)
+                
+                return send_file(
+                    file, 
+                    mimetype='application/octet-stream', 
+                    as_attachment=True, 
+                    download_name=filename)
             
             # Catch S3 download errors
             except Exception as e:
                 return jsonify({'error': str(e)}), 400
-            
-    return send_file(output_path, download_name=filename, as_attachment=True)
 
 
 
-    
-
-
-@app.route('/download/<file_id>', methods=['POST'])
+@app.get('/download/<file_id>')
 @jwt_required()
 def download(file_id):      
     # Get email via JWT Token
     email = get_jwt_identity()
-    password = request.form.get('password')
-
-    if not password:
-        return jsonify({'error': 'Password is required'}), 400
 
     # Connect to database
     connection = get_db_connection()
@@ -351,64 +332,47 @@ def download(file_id):
             s3_key = file_query[0]
             filename = file_query[1]
             
-            output_path = os.path.join(DOWNLOAD_FOLDER, str(uuid4()))
-            input_path = output_path + ".enc"
-
-            # Cleanup files after request
-            @after_this_request
-            def cleanup(response):
-                if os.path.exists(input_path):
-                    os.remove(input_path)
-                if os.path.exists(output_path):
-                    os.remove(output_path)
-                return response
-      
-            # Try to download file from S3 client to save to /downloads folder
             try:
-                file = s3_client.download_file(s3_bucket, s3_key, input_path)
-
-                success = decrypt_file_password(input_path, output_path, password)
-                if not success: 
-                    return jsonify({'error': 'Wrong password or corrupted file'}), 400
+                file = io.BytesIO()
+                
+                s3_client.download_fileobj(
+                    s3_bucket, 
+                    s3_key, 
+                    file)
+                
+                file.seek(0)
+                
+                return send_file(
+                    file, 
+                    mimetype='application/octet-stream', 
+                    as_attachment=True, 
+                    download_name=filename)
             
             # Catch S3 download errors
             except Exception as e:
                 return jsonify({'error': str(e)}), 400
-            
-    return send_file(output_path, download_name=filename, as_attachment=True)
 
 
-@app.route('/upload', methods=['POST'])
+@app.post('/upload')
 @jwt_required()
 def upload():
-    # Get the email of user, uploaded file, and password
+    # Get the email of user and uploaded file
     email = get_jwt_identity()
     file = request.files.get('file')
-    password = request.form.get('password')
 
-    # Validate file and password
-    if not file or not password:
-        return jsonify({'error': 'File and password are required'}), 400
+    # Validate file
+    if not file:
+        return jsonify({'error': 'Missing File'}), 400
     
     # Get secure filename to prevent directory traversal attacks
     filename = secure_filename(file.filename)
     if not filename:
         return jsonify({'error': 'Invalid file name'}), 400
 
-    # Save the uploaded file to the uploads directory
-    input_path = os.path.join(UPLOAD_FOLDER, str(uuid4()))
-    file.save(input_path)
-
-    # Define output path for encrypted file
-    output_path = input_path + '.enc'
-
-    # Connect to database, if connection fails, clean up local files and exit
+    # Connect to database
     connection = get_db_connection()
     if connection is None:
-        if os.path.exists(input_path):
-            os.remove(input_path)
         return jsonify({'error': 'Could not connect to the database'}), 500
-    
     
     with connection:
         with connection.cursor() as cursor:
@@ -416,8 +380,6 @@ def upload():
             cursor.execute("SELECT id FROM users WHERE email = %s", [email])
             data = cursor.fetchone()
             if not data:
-                if os.path.exists(input_path):
-                    os.remove(input_path)
                 return jsonify({'error': 'User not found'}), 404
             
             owner_id = data[0]
@@ -426,23 +388,16 @@ def upload():
             s3_key = f"{owner_id}/{uuid4()}.enc"
             s3_bucket = os.getenv('S3_BUCKET_NAME')
 
-            # Try to encrypt and upload file to S3, if anything fails, return an error response and clean up files
+            # Try to upload file to S3, if anything fails, return an error response and clean up files
             try:
-                success = encrypt_file_password(input_path, output_path, password)
-            
-                if not success:
-                    return jsonify({'error': 'Encryption failed'}), 400
-                
-                s3_client.upload_file(output_path, s3_bucket, s3_key)
+                s3_client.upload_fileobj(
+                    file,
+                    s3_bucket,
+                    s3_key,
+                    ExtraArgs={"ContentType": "application/octet-stream"})
 
             except Exception as e:
-                return jsonify({'error': str(e)}), 400
-
-            finally:
-                if os.path.exists(input_path):
-                    os.remove(input_path)
-                if os.path.exists(output_path):
-                    os.remove(output_path)
+                return jsonify({'error': str(e)}), 500
             
             # Insert metadata into database
             cursor.execute(
@@ -450,7 +405,7 @@ def upload():
                 [owner_id, filename, s3_key]
             )
     
-    return jsonify({'message': 'File uploaded and encrypted successfully!'}), 201
+    return jsonify({'message': 'File uploaded successfully!'}), 201
 
 
 if __name__ == '__main__':
