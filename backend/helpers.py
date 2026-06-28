@@ -1,8 +1,10 @@
 import os
 from dotenv import load_dotenv
+from flask import request
 from psycopg2 import pool, OperationalError
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 from flask_limiter.util import get_remote_address
+
 
 load_dotenv()
 
@@ -59,4 +61,4 @@ def rate_limit_by_user():
         return get_jwt_identity() # Returns their email (e.g., test@example.com)
     except:
         # If no JWT (like on the /login or /register route), fallback to IP
-        return get_remote_address()
+        return request.headers.get('X-Real-IP', request.remote_addr)

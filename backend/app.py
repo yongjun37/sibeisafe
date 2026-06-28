@@ -10,6 +10,7 @@ from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity, jwt_required
 import boto3
 from werkzeug.utils import secure_filename
+from werkzeug.middleware.proxy_fix import ProxyFix
 from uuid import uuid4
 from flask_limiter import Limiter
 
@@ -26,6 +27,7 @@ app.config["JWT_SECRET_KEY"] = os.getenv('JWT_SECRET_KEY')
 bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
 s3_client = boto3.client('s3')
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 limiter = Limiter(
     key_func=rate_limit_by_user,
     app=app,
