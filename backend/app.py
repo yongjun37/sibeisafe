@@ -11,9 +11,10 @@ from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity
 import boto3
 from werkzeug.utils import secure_filename
 from uuid import uuid4
+from flask_limiter import Limiter
 
 # Local imports
-from helpers import is_strong_password, get_db_connection, release_db_connection
+from helpers import is_strong_password, get_db_connection, release_db_connection, rate_limit_by_user
 
 # Load environment variables from .env file
 load_dotenv()
@@ -25,6 +26,16 @@ app.config["JWT_SECRET_KEY"] = os.getenv('JWT_SECRET_KEY')
 bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
 s3_client = boto3.client('s3')
+limiter = Limiter(
+    key_func=rate_limit_by_user,
+    app=app,
+    default_limits=["1000 per day", "100 per hour"],
+    storage_uri="memory://",
+)
+
+# Global Constants
+MAX_UPLOAD_SIZE = 100 # in MB
+HEADER_SIZE = 28
 
 # Normalize JWT Error
 @jwt.unauthorized_loader
@@ -52,6 +63,7 @@ def health():
 
 
 @app.post('/login')
+@limiter.limit("5 per minute")
 def login():
     # Get the email and password from the request
     email = request.form.get('email')
@@ -92,6 +104,7 @@ def login():
     
 
 @app.post('/register')
+@limiter.limit("5 per minute")
 def register():
     # Get the email and password from the request
     email = request.form.get('email')
@@ -380,6 +393,7 @@ def download(file_id):
 
 
 @app.post('/upload')
+@limiter.limit("10 per minute")
 @jwt_required()
 def upload():
     # Get the email of user and uploaded file
@@ -388,7 +402,14 @@ def upload():
 
     # Validate file
     if not file:
-        return jsonify({'error': 'Missing File'}), 400
+        return jsonify({'error': 'Missing File'}), 
+    
+    # Ensure file does not exceed 100MB
+    file.seek(0, os.SEEK_END)
+    file_length = file.tell()
+    file.seek(0)
+    if file_length > MAX_UPLOAD_SIZE * 1024 * 1024 + HEADER_SIZE:
+        return jsonify({"error": f"File size exceeds the {MAX_UPLOAD_SIZE}MB limit"}), 413
     
     # Get secure filename to prevent directory traversal attacks
     filename = secure_filename(file.filename)

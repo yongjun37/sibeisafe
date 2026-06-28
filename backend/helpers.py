@@ -1,6 +1,8 @@
 import os
 from dotenv import load_dotenv
 from psycopg2 import pool, OperationalError
+from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
+from flask_limiter.util import get_remote_address
 
 load_dotenv()
 
@@ -48,3 +50,13 @@ def release_db_connection(connection):
     # Returns the connection to the pool so others can use it.
     if db_pool and connection:
         db_pool.putconn(connection)
+        
+        
+def rate_limit_by_user():
+    try:
+        # Check if the request has a valid JWT
+        verify_jwt_in_request()
+        return get_jwt_identity() # Returns their email (e.g., test@example.com)
+    except:
+        # If no JWT (like on the /login or /register route), fallback to IP
+        return get_remote_address()
