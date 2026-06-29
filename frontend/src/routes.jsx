@@ -4,6 +4,7 @@ import Login from './components/Login.jsx';
 import Register from './components/Register.jsx';
 import PublicDownload from './components/PublicDownload.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import AuthPageLayout from './components/AuthPageLayout.jsx';
 
 const routes = [
 	{
@@ -17,7 +18,12 @@ const routes = [
 						<Dashboard />
 					</ProtectedRoute>
 				)
-			},
+			}
+		]
+	},
+	{
+		element: <AuthPageLayout />,
+		children: [
 			{
 				path: "login",
 				element: <Login />

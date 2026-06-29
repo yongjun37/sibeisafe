@@ -1,32 +1,38 @@
-import Container from 'react-bootstrap/Container';
-import Card from 'react-bootstrap/Card';
-import Form from 'react-bootstrap/Form';
-import Button from 'react-bootstrap/Button';
-import Alert from 'react-bootstrap/Alert';
+import { useState, useEffect, useRef } from 'react';
+import { useParams } from 'react-router-dom';
+import { decrypt_file } from '../utils/crypto';
+import { Alert } from 'react-bootstrap';
 
 import baseURL from '../config';
 
-import { useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { decrypt_file } from '../utils/crypto';
-
 export default function PublicDownload() {
   const { share_id } = useParams();
+  const errorTimerRef = useRef(null);
 
   const [password, setPassword] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState(null);
 
+  const displayError = (msg) => {
+    setError(msg);
+    // If a timer is already running, kill it immediately
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    // Start a brand new 10-second timer
+    errorTimerRef.current = setTimeout(() => {
+      setError(null);
+    }, 10000);
+  };
+
   async function handleDownload(e) {
     e.preventDefault();
 
     if (!password) {
-      setError("Please enter the decryption password.");
+      displayError("Please enter the decryption password.");
       return;
     }
 
     setIsDownloading(true);
-    setError(null);
+    displayError(null);
 
     try {
       const response = await fetch(`${baseURL}/share/${share_id}`, {
@@ -35,7 +41,7 @@ export default function PublicDownload() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        setError(errorData.error);
+        displayError(errorData.error);
         return;
       }
 
@@ -67,11 +73,11 @@ export default function PublicDownload() {
     } catch (e) {
       if (e.name == 'OperationError' || e.name === 'InvalidAccessError') {
 				console.error("Failed to decrypt file:", e);
-				setError("Decryption failed. Please check your file or password and try again.");
+				displayError("Decryption failed. Please check your file or password and try again.");
 
 			} else {
         console.error("Network error:", e);
-			  setError("An error occurred during download. Please try again.");
+			  displayError("An error occurred during download. Please try again.");
       }
 
     } finally {
@@ -80,40 +86,32 @@ export default function PublicDownload() {
   }
 
   return (
-    <Container className="d-flex align-items-center justify-content-center">
-      <Card className="shadow-lg border-0" style={{ width: '100%', maxWidth: '500px' }}>
-        <Card.Body className="p-5">
-          <div className="text-center mb-4">
-            <h2 className="fw-bold">Secure File Transfer</h2>
-            <p>You have been sent an encrypted file.</p>
-          </div>
+    <div className="card border-0 rounded-4 shadow bg-white p-5 d-flex flex-column justify-content-start">
+      <h2 className="fw-bolder text-center">Secure File Transfer</h2>
+      <p className="text-muted text-center">You have been sent an encrypted file.</p>
 
-          {error && <Alert variant="danger">{error}</Alert>}
+      {error && <Alert variant="danger">{error}</Alert>}
 
-          <Form onSubmit={handleDownload}>
-            <Form.Group className="mb-4">
-              <Form.Label className="fw-bold">Decryption Password</Form.Label>
-              <Form.Control
-                type="password"
-                placeholder="Enter the password provided by the sender"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={isDownloading}
-                required
-              />
-            </Form.Group>
+      <form onSubmit={handleDownload} className="d-flex flex-column gap-3">
+        <div className="d-flex flex-column mb-3 mt-4">
+          <label className="fw-bold fs-6 mb-1 text-dark">Password:</label>
+          <input 
+            type="password" 
+            className="form-control"
+            value={password} 
+            onChange={e => setPassword(e.target.value)} 
+            disabled={isDownloading}
+            required 
+          />
+        </div>
 
-            <Button
-              variant="primary"
-              type="submit"
-              className="w-100 fw-bold"
-              disabled={isDownloading}
-            >
-              {isDownloading ? 'Decrypting...' : 'Decrypt and Download'}
-            </Button>
-          </Form>
-        </Card.Body>
-      </Card>
-    </Container>
+        <button 
+          type="submit" 
+          className="submit-btn w-100 py-2 mt-2 fw-bold"
+          disabled={isDownloading}>
+          {isDownloading ? 'Decrypting File...' : 'Download File'}
+        </button>
+      </form>
+    </div>
   );
 }

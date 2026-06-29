@@ -4,16 +4,102 @@
 
 /* Modern circular hover effect for the meatball menu */
 .meatball-btn {
-  border-radius: 50%;            /* Makes the hover background a perfect circle */
-  width: 35px;                   /* Fixed width */
-  height: 35px;                  /* Fixed height */
-  padding: 0 !important;         /* Strips default Bootstrap padding */
-  display: inline-flex;          /* Centers the dots perfectly inside the circle */
+  border-radius: 50%;
+  width: 35px;
+  height: 35px;
+  padding: 0 !important;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.2s ease; /* Smooth fade in/out */
+  transition: background-color 0.2s ease;
+}
+.meatball-btn:hover, .meatball-btn:focus {
+  background-color: rgba(0, 0, 0, 0.08) !important; 
 }
 
-.meatball-btn:hover, .meatball-btn:focus {
-  background-color: rgba(0, 0, 0, 0.08) !important; /* Subtle transparent grey */
+
+/* Auth page styles */
+.auth-page-container {
+  background-color: #f5ffff;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: sans-serif;
+  position: relative;
+}
+.auth-header-logo {
+  position: absolute;
+  top: 24px;
+  left: 32px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+
+/* Register card styles */
+.register-card {
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column; 
+  width: 420px;
+  min-height: 500px;
+}
+.register-left {
+  text-align: center;
+  padding: 50px 20px 0px 20px; 
+}
+.register-divider {
+  display: none; 
+}
+.register-right {
+  padding: 0px 30px 40px 30px; 
+}
+
+@media (min-width: 900px) {
+  .register-card {
+    flex-direction: row; 
+    width: 820px;
+  }
+  .register-left {
+    flex: 1;
+    padding: 20px;
+  }
+  .register-right {
+    flex: 1;
+    padding: 10px 20px;
+  }
+  .register-divider {
+    width: 1px;
+    background-color: #f0f0f0;
+    margin-top: 50px;
+    margin-bottom: 50px;
+  } 
+}
+
+
+/* Login card styles */
+.login-card {
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  width: 420px;
+  min-height: 520px;
+}
+
+/* The deep slate-gray submit button */
+.submit-btn {
+  background-color: #36424e;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+}
+
+.submit-btn:hover {
+  background-color: #273039;
 }
