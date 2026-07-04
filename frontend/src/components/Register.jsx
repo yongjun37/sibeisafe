@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Alert } from 'react-bootstrap';
 
 import baseURL from '../config.js'
-import file_icon from '../assets/file_icon.png'
+import logo from '../assets/logo.png'
 
 export default function Register() {
   const navigate = useNavigate();
@@ -66,13 +66,13 @@ export default function Register() {
   }
 
   return (
-    <div className="register-card shadow bg-white">
+    <div className="register-card shadow">
       <div className="register-left text-center d-flex flex-column justify-content-center align-items-center ">
         <img 
-          src={file_icon} 
-          alt="file-icon" 
+          src={logo} 
+          alt="sibeisafe-logo" 
           className="mb-2" 
-          style={{ width: '48px', height: 'auto' }} 
+          style={{ width: '64px', height: 'auto' }} 
         />
         <h2 className="fw-bolder mb-4">SibeiSafe</h2>
         <h3 className="fs-4 fw-normal mb-2">Create Your Account</h3>
@@ -88,7 +88,7 @@ export default function Register() {
         <form onSubmit={handleRegister} className="d-flex flex-column gap-3">
           
           <div className="d-flex flex-column">
-            <label className="fw-bold fs-6 mb-1 text-dark">Email:</label>
+            <label className="form-label">Email:</label>
             <input 
               type="email" 
               className="form-control"
@@ -100,7 +100,7 @@ export default function Register() {
           </div>
           
           <div className="d-flex flex-column">
-            <label className="fw-bold fs-6 mb-1 text-dark">Password:</label>
+            <label className="form-label">Password:</label>
             <input 
               type="password" 
               className="form-control"
@@ -112,7 +112,7 @@ export default function Register() {
           </div>
           
           <div className="d-flex flex-column mb-3">
-            <label className="fw-bold fs-6 mb-1 text-dark">Confirm Password:</label>
+            <label className="form-label">Confirm Password:</label>
             <input 
               type="password" 
               className="form-control"

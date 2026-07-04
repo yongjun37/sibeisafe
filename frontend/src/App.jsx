@@ -1,12 +1,20 @@
-import { Outlet, Link, useNavigate } from 'react-router-dom';
-import { Container, Navbar, Button } from 'react-bootstrap';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Button, Offcanvas } from 'react-bootstrap';
 import { getItem, removeItem } from './utils/localStorage.js';
-import { useEffect } from 'react';
+import { useState } from 'react';
+
+import UploadForm from './components/UploadForm.jsx';
+
+import logo from './assets/logo.png';
+import { MenuIcon } from './components/Icons.jsx';
+import Sidebar from './components/Sidebar.jsx';
 
 function App() {
   const navigate = useNavigate();
-  const jwt_token = getItem('jwt_token');
-  const isAuthenticated = !!jwt_token
+  const location = useLocation();
+  const [showUploadForm, setShowUploadForm] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [selectedPage, setSelectedPage] = useState('myfiles')
 
   const handleLogout = () => {
     removeItem('jwt_token');
@@ -14,38 +22,52 @@ function App() {
   };
 
   return (
-    <div className="d-flex flex-column min-vh-100">
-      {/* Standard Navbar on all pages */}
-      <Navbar bg="dark" variant="dark" className="mb-4 shadow-sm">
-        <Container>
-          <Navbar.Brand as={Link} to="/">SibeiSafe</Navbar.Brand>
-          <Navbar.Toggle aria-controls="basic-navbar-nav"/>
-          <Navbar.Collapse className="justify-content-end">
-            {isAuthenticated && (
-              <Button variant="outline-light" size="sm" onClick={handleLogout}>
-                Log Out
-              </Button>
-            )}
-          </Navbar.Collapse>
-        </Container>
-      </Navbar>
+    <div className="d-flex vh-100 overflow-hidden">
+      
+      {/* Sidebar that converges into hamburger menu on small screens */}
+      <Sidebar 
+        showSidebar={showSidebar}
+        setShowSidebar={setShowSidebar}
 
-      <Container>
-        {/* Pages displayed here */}
-        <Outlet />
-      </Container>
+        selectedPage={selectedPage}
+        setSelectedPage={setSelectedPage}
 
-      {/* Simple, clean footer */}
-      <footer className="bg-light text-center text-muted py-4 mt-auto border-top">
-        <Container>
-          <small>
-            <strong>SibeiSafe</strong> is a technical portfolio project built for educational purposes.
-            Please do not upload actual sensitive personal, medical, or financial data.
-          </small>
-        </Container>
-      </footer>
+        setShowUploadForm={setShowUploadForm}
+        handleLogout={handleLogout}
+      />
+
+      <div className="main-layout">
+        
+        {/* Mobile only header */}
+        <div className="mobile-header shadow-sm d-md-none">
+          <button className="btn border-0 p-0 bg-transparent" onClick={() => setShowSidebar(true)}>
+            <MenuIcon />
+          </button>
+          <img 
+            src={logo} 
+            alt="Logo" 
+            style={{ width: '24px' }} 
+            className="ms-3 me-2" />
+          <h5 className="mb-0 fw-bold">SibeiSafe</h5>
+        </div>
+
+        {/* Main content area*/}
+        <div className="main-content-area">
+          <Outlet />
+        </div>
+
+      </div>
+
+      {/* Upload form */}
+      <UploadForm 
+        show={showUploadForm} 
+        onHide={() => setShowUploadForm(false)}
+        onSuccess={() => {
+           setShowUploadForm(false);
+        }} 
+      />
     </div>
   );
 }
 
-export default App
+export default App;

@@ -75,14 +75,17 @@ export default function Login() {
     
   }
   return (
-    <div className='login-card shadow bg-white p-5 d-flex flex-column justify-content-start'>
-      <h2 className="fw-bolder">Sign In</h2>
+    <div className='login-card shadow'>
+      <h2 className="fw-bold">Sign In</h2>
       <p className="text-muted">To continue to SibeiSafe</p>
+
       {error && <Alert variant="danger">{error}</Alert>}
+
       {accountCreated && <Alert variant="success">{accountCreated}</Alert>}
+
       <form onSubmit={handleLogin} className="d-flex flex-column gap-3">
         <div className="d-flex flex-column">
-          <label className="fw-bold fs-6 mb-1 text-dark">Email:</label>
+          <label className="form-label">Email:</label>
           <input 
             type="email" 
             className="form-control"
@@ -94,7 +97,7 @@ export default function Login() {
         </div>
         
         <div className="d-flex flex-column mb-3">
-          <label className="fw-bold fs-6 mb-1 text-dark">Password:</label>
+          <label className="form-label">Password:</label>
           <input 
             type="password" 
             className="form-control"

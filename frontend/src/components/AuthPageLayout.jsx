@@ -2,30 +2,31 @@ import React from 'react';
 import { Outlet, Link } from 'react-router-dom';
 
 import '../styles/App.css'
-import file_icon from '../assets/file_icon.png'
-import { Container } from 'react-bootstrap';
+import logo from '../assets/logo.png'
+import Container from 'react-bootstrap/Container';
+import Navbar from 'react-bootstrap/Navbar';
 
  
 export default function AuthPageLayout() {
   return (
-    <>
-      <div className="auth-page-container">
-        {/* Top Left Logo linking to login */}
-        <Link to="/" className="auth-header-logo text-decoration-none text-dark">
-          <img
-            src={file_icon}
-            alt='file-icon'
-            style={{ width: '28px', height: 'auto' }} 
-          />
-          <span>SibeiSafe</span>
-        </Link>
-        
-        <main className="w-100 d-flex justify-content-center align-items-center">
-          <Outlet />
-        </main>
-      </div>
+    <div className='auth-layout'>
+      <Navbar className="bg-transparent pt-3">
+          <Container fluid className="px-5">
+            <Navbar.Brand 
+              as={Link} to="/" 
+              className="d-flex align-items-center gap-2 fw-bold fs-4"
+            >
+              <img src={logo} alt='sibeisafe-logo' style={{ width: '32px', height: 'auto' }}/>
+              SibeiSafe
+            </Navbar.Brand>
+          </Container>
+      </Navbar>
 
-      <footer className="w-100 text-center py-4 text-muted" style={{ fontSize: '14px' }}>
+      <main className="auth-main-content">
+        <Outlet />
+      </main>
+
+      <footer className="auth-footer" style={{ fontSize: '14px' }}>
         <Container>
           <small>
             <strong>SibeiSafe</strong> is a technical portfolio project built for educational purposes.
@@ -33,8 +34,6 @@ export default function AuthPageLayout() {
           </small>
         </Container>
       </footer>    
-    </>
-
-    
+    </ div>
   );
 }
