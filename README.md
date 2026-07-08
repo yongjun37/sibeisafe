@@ -1,121 +1,51 @@
-# Sibei Safe
-A web application allowing for encrypting and decrypting files using AES-256 encryption (Fernet cipher) via password-based encryption.
+# SibeiSafe
+SibeiSafe is a web-based storage application built strictly on a zero-knowledge architecture. By utilizing the [Web Crypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API), all files are encrypted entirely client-side before transmission, ensuring the server never sees plaintext data.
+
+**Live Site:** https://sibeisafe.xyz\
+**Github Repository:** https://github.com/yongjun37/sibeisafe 
 
 ## Tech Stack
-- **Frontend:** React (JavaScript) 
--  **Backend:** Python, Flask, Flask-CORS
--  **Cryptography:** Python `cryptography` library (AES-256 (Fernet), PBKDF2HMAC, SHA-256)
+|   |   |
+|---|---|
+| **Frontend** | React, Vite, Bootstrap 5 |
+| **Backend + Data** | Flask + Gunicorn, PostgreSQL, AWS S3 |
+| **Infrastructure** | Nginx, AWS EC2 |
+| **Security & Cryptography** | Web Crypto API, Flask-JWT-Extended, Flask-Bcrypt |
+
+## Documentation
+For a deep dive into the decisions, infrastructure, and cryptographic pipeline behind SibeiSafe, please refer to the `docs/` directory:
+* [System Architecture & Infrastructure](docs/ARCHITECTURE.md)
+* [Security Architecture & Threat Model](docs/SECURITY.md)
+* [Author's Notes & Project Evolution](docs/AUTHORSNOTES.md)
 
 
-## Getting Started
-### Requirements
-- python 3.9+
-- npm and Node.js
+## Feature Data Flow
+- **Register:** Frontend validates strength → Backend hashes via bcrypt → Store email and hashed password in PostgreSQL 
 
-### Backend
-1. Navigate to your backend directory. 
-2. Create and activate a virtual environment ***(Optional but Recommended)*** :
-	```bash
-	python -m venv .venv
-	source venv/bin/activate 	# On Windows use .venv\Scripts\Activate.ps1
-	```
-3. Install dependencies 
-	```bash
-	pip install Flask flask-cors cryptography
-	```
-4. Start the Flask Server
-	```bash
-	python app.py # Backend will run on http://localhost:5000
-	```
-### Frontend 
-1. Navigate to frontend directory.
-2. Start the development server:
-	```bash
-	npm run dev
-	```
-## Usage 
-1. Open the frontend application in your browser.
+- **Login:** POST `/api/login`→ Backend hashes via bcrypt. → Compare hashed password with PostgreSQL data → Issue JWT Token.
 
-2.  **To Encrypt:** Navigate to the Encrypt view, upload a file, enter a strong password, and click "Encrypt". The encrypted file (ending in `.enc`) will automatically download to your machine.
+- **Upload:** Client encrypts file → POST `/api/upload` → Backend streams blob to AWS S3 → Record metadata in PostgreSQL
 
- 3.   **To Decrypt:** Navigate to the Decrypt view, upload your `.enc` file, enter the exact password used for encryption, and click "Decrypt". The original file will be restored and downloaded.
+- **Dashboard:** GET `/api/files` → Backend verifies JWT → Returns database records owned by to the authenticated `owner_id`.
 
-## CLI Tool
-The `crypto.py` module acts as the heavy lifter for the application and can be used as a standalone Python script or imported into other projects. 
+- **Download:** GET `/api/download/<id>` → JWT ownership check → Fetch blob from S3 → Client's Browser extracts Salt/IV and decrypts locally.
 
-One such use case would be a CLI tool which was the inital use case before evolving into a web application.
+- **Share:** `POST /api/files/<file_id>/share` → Generates a temporary `share_uuid` → Unauthenticated user accesses `/share/:share_uuid`  → Decrypts and download client-side using a password shared from other channels (Revoked via `DELETE`).
+
+- **Delete:** JWT ownership check → Backend deletes encrypted blob from S3 → delete PostgreSQL metadata record.
 
 
+## Known Limitations & Trade-offs
+- **No DEK/KEK Architecture:** Enterprise systems like ProtonDrive uses this architecture, allowing users to store encrypted files without the need of a password. Implementing this added massive complexity and was hence deferred.
+  
+- **Unencrypted Metadata:** While file contents are encrypted, account and file metadata are stored in plaintext in PostgreSQL. This is a required to allow for authentication routing and dashboard generation.
 
-###  Usage:
-
-#### 1. Generate Encryption Key File
-```powershell
-python crypto_cli.py genkey --out mykey.key    # Creates a new encryption key and saves it to my.key
-```
-#### 2. Encrypt Files
-
-**Using key file:**
-```powershell
-python crypto_cli.py encrypt --in document.pdf --out document.pdf.enc --key my.key
-```
-**Using password:**
-```powershell
-python crypto_cli.py encrypt --in document.pdf --out document.pdf.enc --password
-# You'll be prompted to enter and confirm password
-```
-
-#### 3. Decrypt Files
-
-**Using key file:**
-```powershell
-python crypto_cli.py decrypt --in document.pdf.enc --out document.pdf --key mykey.key
-```
-
-**Using password:**
-```powershell
-python crypto_cli.py decrypt --in document.pdf.enc --out document.pdf --password
-# You'll be prompted to enter password
-```
-
-#### 4. Hash Files (Integrity Check)
-
-**Generate hash:**
-```powershell
-python crypto_cli.py hash --in document.pdf
-# Output: SHA-256: a3c5f9e2b1d4c8a7f6e5...
-```
-
-**Verify file integrity:**
-```powershell
-python crypto_cli.py verify --in document.pdf --hash a3c5f9e2b1d4c8a7f6e5...
-# Output: ✅ File integrity verified
-```
-
-### Exit Codes
-| Code | Meaning                                                   |
-| ---- | --------------------------------------------------------- |
-| `0`  | Success                                                   |
-| `1`  | User / file error (missing file, invalid input)           |
-| `2`  | Cryptographic failure (wrong key/password, tampered file) |
+- **No password recovery:** Because the server never processes or stores the file encryption password, it is mathematically impossible to reset it. A forgotten password means the encrypted files are permanently unrecoverable.
+  
+- **No Server-Side Virus Scanning:** Because the backend only receives an ecnrypted blob, the server is unable to read to the file's contents, making malware scanning impossible. 
 
 
-## Roadmap & Future Improvements 
-
-- **Batch & Directory Encryption:** Allow users to securely process multiple files or entire folders at once.
--  **Pre-Encryption Compression:** Optimize storage and transfer times by compressing files prior to encryption. 
-- **Cloud Infrastructure (AWS S3):** Transition from local file handling to secure, scalable cloud object storage. 
-- **UI/UX Enhancements:** Continue refining the web interface for a smoother, more intuitive user experience. 
-
-## What's built
-- **CLI Tool:** Developed a secure command-line interface (`crypto_cli.py`) to interact directly with the main cryptographic engine (`crypto.py`)
-
--  **Frontend and Backend Integration:** Successfully connected the React UI with the Flask encryption engine. 
-
-## Author's Notes 
-I built Sibei Safe as a hands-on project to deepen my practical understanding of both full-stack development and secure file handling. Building this tool allowed me to explore several key concepts. 
-
-### Concepts Learnt:
-- **Applied Cryptography:** Implementing symmetric encryption, password-based key derivation (PBKDF2), and handling cryptographic failures securely. 
-- **Secure Tooling:** Designing a robust command-line interface for the underlying cryptographic engine. 
--  **Full-Stack Architecture:** Learning the basics of React and Flask, and successfully bridging the gap between a modern frontend and a Python backend.
+## Future Improvements
+- **DEK/KEK Architecture (v2):** Implementing an asymmetric key-wrapping system to allow for seamless password rotations without requiring users to download, re-encrypt, and re-upload their files.
+  
+- **Infrastructure as Code (IaC):** Containerization and CI/CD pipelines to streamline deployment.

@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from getpass import getpass
 
-from backend.crypto import (generate_key, 
+from tools.crypto import (generate_key, 
                     save_key, 
                     load_key, 
                     encrypt_file, 
