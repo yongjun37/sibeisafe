@@ -32,7 +32,7 @@ limiter = Limiter(
     key_func=rate_limit_by_user,
     app=app,
     default_limits=["1000 per day", "100 per hour"],
-    storage_uri="redis://localhost:6379",
+    storage_uri=os.getenv('REDIS_URL'),
 )
 
 # Global Constants

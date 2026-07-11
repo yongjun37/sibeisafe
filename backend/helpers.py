@@ -38,15 +38,29 @@ try:
 except OperationalError as e:
     print(f"FATAL: Error creating connection pool: {e}")
     db_pool = None
+    
+db_pool = None
 
 def get_db_connection():
+    global db_pool
+    
     # Borrows a connection from the pool.
-    if db_pool:
+    if db_pool is None:
         try:
-            return db_pool.getconn()
+            db_pool = pool.ThreadedConnectionPool(
+                minconn=1,
+                maxconn=10,
+                dsn=os.getenv('DATABASE_URL')
+            )
         except Exception as e:
             print(f"Unable to get connection from pool: {e}")
             return None
+    try:
+        return db_pool.getconn()
+    except Exception as e:
+        print(f"Unable to get connection from pool: {e}")
+        return None
+    
 
 def release_db_connection(connection):
     # Returns the connection to the pool so others can use it.
