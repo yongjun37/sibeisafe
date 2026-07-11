@@ -1,7 +1,7 @@
 # SibeiSafe
 SibeiSafe is a web-based storage application built strictly on a zero-knowledge architecture. By utilizing the [Web Crypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API), all files are encrypted entirely client-side before transmission, ensuring the server never sees plaintext data.
 
-**Live Site:** https://sibeisafe.xyz\
+**Live Site:** https://sibeisafe.xyz \
 **Github Repository:** https://github.com/yongjun37/sibeisafe 
 
 ## Tech Stack
