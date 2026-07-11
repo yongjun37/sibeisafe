@@ -1,2 +1,24 @@
+# Security & Git
+.git
+.gitignore
 .env
-__pycache__
+
+# Local Virtual Environments (CRITICAL)
+venv/
+.venv/
+env/
+
+# Python Cache & Bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Docker Files (No need to put the blueprint inside the house)
+Dockerfile
+docker-compose.yml
+
+# OS Junk
+.DS_Store
+Thumbs.db
