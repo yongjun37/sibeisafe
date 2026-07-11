@@ -15,7 +15,7 @@ services:
     image: sibeisafe-frontend:latest
     container_name: sibeisafe-frontend
     ports:
-      - "80:80"
+      - "127.0.0.1:8080:80"
     depends_on:
       - backend
     restart: unless-stopped
@@ -40,8 +40,11 @@ services:
   redis:
     image: redis:8.0.1-alpine
     container_name: sibeisafe-redis
+    volumes:
+      - redis_data:/data
     restart: unless-stopped
 
 
 volumes:
   pgdata:
+  redis_data:
