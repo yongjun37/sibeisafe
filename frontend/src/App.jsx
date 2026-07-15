@@ -1,20 +1,50 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Button, Offcanvas } from 'react-bootstrap';
 import { getItem, removeItem } from './utils/localStorage.js';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import baseURL from "./config";
 
 import UploadForm from './components/UploadForm.jsx';
-
 import logo from './assets/logo.png';
 import { MenuIcon } from './components/Icons.jsx';
 import Sidebar from './components/Sidebar.jsx';
 
 function App() {
   const navigate = useNavigate();
+
   const location = useLocation();
+
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [selectedPage, setSelectedPage] = useState('myfiles')
+  const [files, setFiles] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  async function getFiles() {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`${baseURL}/files`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${getItem('jwt_token')}` }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        alert(`File fetch failed: ${data.error}`);
+        return [];
+      }
+      setFiles(data);
+      return data;
+    } catch (error) {
+      console.error("Network error:", error);
+      return [];
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+      getFiles();
+    }, []);
 
   const handleLogout = () => {
     removeItem('jwt_token');
@@ -53,7 +83,10 @@ function App() {
 
         {/* Main content area*/}
         <div className="main-content-area">
-          <Outlet />
+          <Outlet context={{ files, 
+                             isLoading, 
+                             getFiles,
+                             setShowUploadForm }}/>
         </div>
 
       </div>
@@ -64,6 +97,7 @@ function App() {
         onHide={() => setShowUploadForm(false)}
         onSuccess={() => {
            setShowUploadForm(false);
+           getFiles();
         }} 
       />
     </div>

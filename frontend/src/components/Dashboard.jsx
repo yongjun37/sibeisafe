@@ -2,6 +2,7 @@ import '../styles/App.css';
 
 import { useEffect, useState } from "react"
 import { getItem } from "../utils/localStorage"
+import { useOutletContext } from "react-router-dom";
 
 import baseURL from "../config";
 import DownloadForm from "./DownloadForm"
@@ -11,56 +12,10 @@ import ShareModal from './ShareModal';
 
 
 function Dashboard() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [files, setFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [showUploadForm, setShowUploadForm] = useState(false);
   const [sharedFile, setSharedFile] = useState(null);
 
-
-  // Get list of user's files from API
-  async function getFiles() {
-    try {
-      setIsLoading(true);
-      // Get response from API
-      const response = await fetch(`${baseURL}/files`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${getItem('jwt_token')}`
-        }
-      });
-
-      // Parse response
-      const data = await response.json();
-
-      // if HTTP code is not 2xx show error message
-      if (!response.ok) {
-        alert(`File fetch failed: ${data.error}`);
-        return [];
-      }
-
-      // Update state variable
-      setFiles(data);
-
-      return data;
-
-    } catch (error) {
-
-      // Log error in console
-      console.error("Network error:", error);
-      return [];
-
-    } finally {
-      setIsLoading(false);
-
-    }
-  }
-
-  // Get the list of files upon initial render
-  useEffect(() => {
-    getFiles();
-  }, [])
-
+  const { files, isLoading, getFiles, setShowUploadForm } = useOutletContext();
 
   return (
     <>
@@ -104,16 +59,6 @@ function Dashboard() {
         onHide={() => setSelectedFile(null)}
         filename={selectedFile ? selectedFile.name : ''}
         fileid={selectedFile ? selectedFile.id : ''}
-      />
-
-      {/* Upload Form Popup */}
-      <UploadForm
-        show={showUploadForm}
-        onHide={() => setShowUploadForm(false)}
-        onSuccess={() => {
-          getFiles();
-          setShowUploadForm(false);
-        }}
       />
 
       {/* Share Link Popup */}
